@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -12,25 +12,27 @@ import {
   Check,
   X,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import axios from "axios";
 
-// Đường dẫn API Backend kết nối tới database MongoDB Atlas của bạn
+// ĐƯỜNG DẪN API BACKEND CỦA BẠN (TỪ FILE APP.JSX CHUẨN)
 const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
 
 export default function App() {
-  // --- STATE QUẢN LÝ DỮ LIỆU ---
+  // === STATE QUẢN LÝ DỮ LIỆU ===
   const [decks, setDecks] = useState([]);
-  const [currentView, setCurrentView] = useState("home");
+  const [currentView, setCurrentView] = useState("home"); // "home" | "edit" | "study"
   const [activeDeckId, setActiveDeckId] = useState(null);
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
 
-  // State quản lý Modal Welcome
+  // === STATE GIAO DIỆN (TỪ OLDBUTNOGG) ===
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 }); // Hiệu ứng bubble lan tỏa
 
-  // State quản lý form nhập liệu
+  // === STATE FORM NHẬP LIỆU ===
   const [newDeckTitle, setNewDeckTitle] = useState("");
   const [newCard, setNewCard] = useState({
     korean: "",
@@ -39,428 +41,422 @@ export default function App() {
     note: "",
   });
 
-  // --- STATE TÀI KHOẢN (Đã sửa lại đúng logic App.jsx cũ) ---
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("flashcard_user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  // === STATE TÀI KHOẢN (LOGIC APP.JSX CHUẨN) ===
+  const [user, setUser] = useState(null);
 
-  // Tải dữ liệu khi vừa mở web hoặc khi user thay đổi
-  useEffect(() => {
-    fetchDecks();
-  }, [user]);
-
-  // --- HIỆU ỨNG CHUỘT (Bubble Gradient từ oldbutnogg) ---
+  // Hiệu ứng chuột Bubble Gradient
   useEffect(() => {
     const handleMouseMove = (e) => {
-      const bubble = document.createElement("div");
-      bubble.className =
-        "pointer-events-none fixed w-8 h-8 rounded-full bg-gradient-to-r from-pink-300/40 to-purple-400/40 blur-md mix-blend-screen transition-all duration-700 ease-out z-50";
-      bubble.style.left = `${e.clientX}px`;
-      bubble.style.top = `${e.clientY}px`;
-      bubble.style.transform = "translate(-50%, -50%) scale(1)";
-      document.body.appendChild(bubble);
-
-      requestAnimationFrame(() => {
-        bubble.style.transform = "translate(-50%, -200%) scale(0)";
-        bubble.style.opacity = "0";
-      });
-
-      setTimeout(() => {
-        bubble.remove();
-      }, 700);
+      setMousePos({ x: e.clientX, y: e.clientY });
     };
-
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  // --- LOGIC API & GOOGLE LOGIN ---
-  const fetchDecks = async () => {
-    try {
-      const emailToFetch = user ? user.email : "default";
-      const response = await axios.get(`${API_URL}?userEmail=${emailToFetch}`);
-      setDecks(response.data);
-    } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu:", error);
-    }
-  };
-
+  // === LOGIC ĐĂNG NHẬP GOOGLE & FETCH DATA CỦA APP.JSX ===
   const handleLoginSuccess = async (credentialResponse) => {
-    try {
-      const decoded = jwtDecode(credentialResponse.credential);
-      const userData = {
-        name: decoded.name,
-        email: decoded.email,
-        picture: decoded.picture,
-      };
-      setUser(userData);
-      localStorage.setItem("flashcard_user", JSON.stringify(userData));
-    } catch (error) {
-      console.error("Lỗi giải mã token:", error);
-    }
+    const decoded = jwtDecode(credentialResponse.credential);
+    setUser({
+      name: decoded.name,
+      email: decoded.email,
+      picture: decoded.picture,
+    });
+    fetchDecks(decoded.email);
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem("flashcard_user");
+    setDecks([]);
+    setCurrentView("home");
   };
 
-  const handleAddDeck = async () => {
-    if (!newDeckTitle.trim()) return;
+  const fetchDecks = async (email) => {
     try {
-      const newDeckData = {
+      const response = await axios.get(`${API_URL}?email=${email}`);
+      setDecks(response.data);
+    } catch (error) {
+      console.error("Lỗi khi tải dữ liệu:", error);
+    }
+  };
+
+  // Tải dữ liệu lại mỗi khi có thay đổi User
+  useEffect(() => {
+    if (user) {
+      fetchDecks(user.email);
+    }
+  }, [user]);
+
+  // === LOGIC XỬ LÝ DB (DECK & THẺ TỪ APP.JSX) ===
+  const handleCreateDeck = async () => {
+    if (!newDeckTitle.trim()) return;
+    if (!user) {
+      alert("Vui lòng đăng nhập để tạo bộ từ vựng cá nhân!");
+      return;
+    }
+    try {
+      const response = await axios.post(API_URL, {
         title: newDeckTitle,
+        color: "bg-white/40", // Màu thẻ Glassmorphism mặc định
+        userEmail: user.email,
         cards: [],
-        userEmail: user ? user.email : "default",
-      };
-      const response = await axios.post(API_URL, newDeckData);
+      });
       setDecks([...decks, response.data]);
       setNewDeckTitle("");
     } catch (error) {
-      console.error("Lỗi khi thêm bộ từ vựng:", error);
+      console.error("Lỗi khi tạo deck:", error);
     }
   };
 
-  const handleDeleteDeck = async (deckId) => {
+  const handleDeleteDeck = async (id) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa bộ từ vựng này?")) return;
     try {
-      await axios.delete(`${API_URL}/${deckId}`);
-      setDecks(decks.filter((d) => d._id !== deckId));
+      await axios.delete(`${API_URL}/${id}`);
+      setDecks(decks.filter((deck) => deck._id !== id));
+      if (activeDeckId === id) {
+        setCurrentView("home");
+        setActiveDeckId(null);
+      }
     } catch (error) {
-      console.error("Lỗi khi xóa bộ từ:", error);
+      console.error("Lỗi khi xóa deck:", error);
     }
   };
 
-  const handleAddCard = async (deckId) => {
-    if (!newCard.korean.trim() || !newCard.viet.trim()) return;
+  const handleAddCard = async () => {
+    if (!newCard.korean || !newCard.viet) return;
     try {
       setSaveStatus("saving");
-      const currentDeck = decks.find((d) => d._id === deckId);
-      const updatedDeckData = {
-        ...currentDeck,
-        cards: [
-          ...currentDeck.cards,
-          { ...newCard, id: Date.now().toString() },
-        ],
-      };
+      const activeDeck = decks.find((d) => d._id === activeDeckId);
+      const updatedCards = [
+        ...activeDeck.cards,
+        { ...newCard, id: Date.now().toString() },
+      ];
 
-      const response = await axios.put(`${API_URL}/${deckId}`, updatedDeckData);
-      setDecks(decks.map((d) => (d._id === deckId ? response.data : d)));
+      await axios.put(`${API_URL}/${activeDeckId}`, {
+        cards: updatedCards,
+      });
+
+      setDecks(
+        decks.map((deck) =>
+          deck._id === activeDeckId ? { ...deck, cards: updatedCards } : deck
+        )
+      );
+
       setNewCard({ korean: "", romaji: "", viet: "", note: "" });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus(""), 2000);
     } catch (error) {
-      console.error("Lỗi khi thêm từ vựng:", error);
+      console.error("Lỗi khi thêm thẻ:", error);
       setSaveStatus("error");
     }
   };
 
   const handleDeleteCard = async (deckId, cardId) => {
     try {
-      const currentDeck = decks.find((d) => d._id === deckId);
-      const updatedDeckData = {
-        ...currentDeck,
-        cards: currentDeck.cards.filter((c) => c.id !== cardId),
-      };
+      const activeDeck = decks.find((d) => d._id === deckId);
+      const updatedCards = activeDeck.cards.filter((c) => c.id !== cardId);
 
-      const response = await axios.put(`${API_URL}/${deckId}`, updatedDeckData);
-      setDecks(decks.map((d) => (d._id === deckId ? response.data : d)));
+      await axios.put(`${API_URL}/${deckId}`, {
+        cards: updatedCards,
+      });
+
+      setDecks(
+        decks.map((deck) =>
+          deck._id === deckId ? { ...deck, cards: updatedCards } : deck
+        )
+      );
     } catch (error) {
-      console.error("Lỗi khi xóa từ vựng:", error);
+      console.error("Lỗi khi xóa thẻ:", error);
     }
   };
 
+  // === ĐIỀU HƯỚNG VÀ HỖ TRỢ HỌC (KEYBOARD) ===
   const activeDeck = decks.find((d) => d._id === activeDeckId);
 
-  // --- PHÍM TẮT ĐỂ HỌC ---
+  const startStudy = (deckId) => {
+    setActiveDeckId(deckId);
+    setCardIndex(0);
+    setIsFlipped(false);
+    setCurrentView("study");
+  };
+
+  const editDeck = (deckId) => {
+    setActiveDeckId(deckId);
+    setCurrentView("edit");
+  };
+
+  const nextCard = () => {
+    if (activeDeck && cardIndex < activeDeck.cards.length - 1) {
+      setIsFlipped(false);
+      setTimeout(() => setCardIndex(cardIndex + 1), 150);
+    }
+  };
+
+  const prevCard = () => {
+    if (cardIndex > 0) {
+      setIsFlipped(false);
+      setTimeout(() => setCardIndex(cardIndex - 1), 150);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (
-        currentView !== "study" ||
-        !activeDeck ||
-        activeDeck.cards.length === 0
-      )
-        return;
+      if (currentView !== "study") return;
       if (e.key === " ") {
         e.preventDefault();
-        setIsFlipped((prev) => !prev);
+        setIsFlipped(!isFlipped);
       } else if (e.key === "ArrowRight") {
-        setIsFlipped(false);
-        setCardIndex((prev) => (prev + 1) % activeDeck.cards.length);
+        nextCard();
       } else if (e.key === "ArrowLeft") {
-        setIsFlipped(false);
-        setCardIndex(
-          (prev) =>
-            (prev - 1 + activeDeck.cards.length) % activeDeck.cards.length
-        );
+        prevCard();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentView, activeDeck]);
+  }, [currentView, isFlipped, cardIndex, activeDeck]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 font-sans selection:bg-purple-300 selection:text-purple-900 overflow-x-hidden">
-      {/* --- WELCOME MODAL --- */}
+    <div className="min-h-screen font-sans text-gray-800 relative overflow-hidden bg-gradient-to-br from-pink-100 via-purple-100 to-indigo-100">
+      {/* HIỆU ỨNG CHUỘT BUBBLE GRADIENT */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 opacity-40 mix-blend-multiply transition-transform duration-300 ease-out"
+        style={{
+          background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(255, 182, 193, 0.4), transparent 40%)`,
+        }}
+      />
+
+      {/* WELCOME MODAL GLASSMORPHISM */}
       {showWelcomeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white/90 p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center border border-white/20 transform transition-all">
-            <h2 className="text-2xl font-black text-purple-800 mb-4 font-title">
-              Xin chào! 👋
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4 transition-opacity">
+          <div className="bg-white/60 backdrop-blur-xl border border-white/50 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-400 to-purple-400"></div>
+            <Sparkles className="w-12 h-12 text-pink-500 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold font-title text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-2">
+              Xin chào!
             </h2>
-            <p className="text-gray-600 mb-8 leading-relaxed font-medium">
-              Chào mừng bạn đến với góc học tập tiếng Hàn nhỏ xinh này. Chúc bạn
-              học thật vui vẻ nhé!
+            <p className="text-gray-600 mb-8 leading-relaxed">
+              Chào mừng bạn đến với Hokusora Flashcards. Hãy đăng nhập để tạo
+              góc học tập tiếng Hàn của riêng bạn với giao diện trong trẻo và
+              mềm mại nhé!
             </p>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={() => setShowWelcomeModal(false)}
-                className="px-6 py-2.5 rounded-full bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors"
-              >
-                Đóng
-              </button>
-              <button
-                onClick={() => setShowWelcomeModal(false)}
-                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all"
-              >
-                Bắt đầu học
-              </button>
-            </div>
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              className="w-full py-3 bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white rounded-xl font-bold shadow-lg shadow-pink-200 transition-all transform hover:scale-[1.02]"
+            >
+              Bắt đầu khám phá
+            </button>
           </div>
         </div>
       )}
 
-      {/* --- MAIN CONTAINER --- */}
-      <div className="max-w-4xl mx-auto p-4 md:p-8">
-        {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6 bg-white/40 p-6 rounded-3xl backdrop-blur-md shadow-sm border border-white/50">
-          <div className="text-center md:text-left">
-            <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-700 to-pink-600 font-title mb-2">
-              Korean Flashcards
-            </h1>
-            <p className="text-sm font-medium text-purple-600/80 bg-purple-100/50 inline-block px-3 py-1 rounded-full">
-              Học từ vựng mỗi ngày ✨
-            </p>
-          </div>
+      {/* PHẦN NỘI DUNG CHÍNH */}
+      <div className="relative z-10 max-w-6xl mx-auto p-4 md:p-8">
+        {/* HEADER: TITLE & LOGIC ĐĂNG NHẬP */}
+        <header className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white/30 backdrop-blur-md border border-white/50 p-4 md:p-6 rounded-3xl shadow-xl">
+          <h1 className="text-3xl md:text-4xl font-bold font-title text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-4 md:mb-0 flex items-center gap-3">
+            <Sparkles className="text-pink-500" /> Hokusora Flashcards
+          </h1>
 
-          {/* User & Login Section */}
           <div className="flex items-center gap-4">
-            {user ? (
-              <div className="flex items-center gap-4 bg-white/60 pl-4 pr-2 py-2 rounded-full border border-white">
-                <img
-                  src={user.picture}
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full ring-2 ring-purple-200"
-                />
-                <div className="hidden sm:block">
-                  <p className="text-sm font-bold text-gray-800">{user.name}</p>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors ml-2"
-                  title="Đăng xuất"
-                >
-                  <LogOut size={18} />
-                </button>
-              </div>
-            ) : (
-              <div className="shadow-xl rounded-full overflow-hidden hover:scale-105 transition-transform">
+            {!user ? (
+              <div className="overflow-hidden rounded-full shadow-lg border-2 border-white/50">
                 <GoogleLogin
                   onSuccess={handleLoginSuccess}
                   onError={() => console.log("Login Failed")}
+                  useOneTap
                   theme="outline"
                   shape="pill"
                 />
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/50 shadow-md">
+                <img
+                  src={user.picture}
+                  alt="avatar"
+                  className="w-9 h-9 rounded-full border-2 border-white object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <span className="font-semibold text-gray-700 hidden sm:block">
+                  {user.name}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors ml-2"
+                  title="Đăng xuất"
+                >
+                  <LogOut size={16} />
+                </button>
               </div>
             )}
           </div>
         </header>
 
-        {/* --- TRANG CHỦ --- */}
+        {/* MÀN HÌNH CHÍNH (HOME) */}
         {currentView === "home" && (
-          <div className="space-y-8 animate-in fade-in duration-700">
-            {/* Create Deck Area */}
-            <div className="bg-white/60 backdrop-blur-xl p-6 rounded-3xl shadow-sm border border-white flex gap-3 items-center">
+          <div className="space-y-8 animate-fade-in">
+            {/* THÊM DECK MỚI */}
+            <div className="bg-white/40 backdrop-blur-xl border border-white/50 p-6 rounded-3xl shadow-xl flex flex-col sm:flex-row gap-4 items-center">
               <input
                 type="text"
-                placeholder="Nhập tên bộ từ vựng mới..."
+                placeholder="Nhập tên bộ từ vựng mới (Vd: TOPIK II, Từ vựng bài 1...)"
+                className="flex-1 bg-white/60 border border-white focus:outline-none focus:ring-2 focus:ring-pink-300 rounded-2xl px-5 py-3 text-gray-700 placeholder-gray-400 font-medium w-full"
                 value={newDeckTitle}
                 onChange={(e) => setNewDeckTitle(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddDeck()}
-                className="flex-1 bg-white/80 border-0 px-5 py-3.5 rounded-2xl focus:ring-2 focus:ring-purple-400 focus:bg-white transition-all font-medium text-gray-700 placeholder-purple-300 outline-none"
+                onKeyPress={(e) => e.key === "Enter" && handleCreateDeck()}
               />
               <button
-                onClick={handleAddDeck}
-                disabled={!newDeckTitle.trim()}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3.5 rounded-2xl hover:shadow-lg hover:shadow-purple-500/30 disabled:opacity-50 transition-all disabled:hover:shadow-none hover:scale-105 active:scale-95"
+                onClick={handleCreateDeck}
+                className="w-full sm:w-auto bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-pink-200 transition-all transform hover:scale-105"
               >
-                <Plus size={24} />
+                <Plus size={20} /> Tạo Bộ Từ
               </button>
             </div>
 
-            {/* Deck List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {decks.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-purple-400 font-medium bg-white/30 rounded-3xl border border-dashed border-purple-200">
-                  Chưa có bộ từ vựng nào. Hãy tạo mới ở trên nhé!
-                </div>
-              ) : (
-                decks.map((deck) => (
+            {/* DANH SÁCH DECK */}
+            {!user ? (
+              <div className="text-center py-16 bg-white/30 backdrop-blur-md rounded-3xl border border-white/50 shadow-lg">
+                <p className="text-gray-500 text-lg font-medium">
+                  Vui lòng đăng nhập để xem và tạo từ vựng của bạn.
+                </p>
+              </div>
+            ) : decks.length === 0 ? (
+              <div className="text-center py-16 bg-white/30 backdrop-blur-md rounded-3xl border border-white/50 shadow-lg">
+                <p className="text-gray-500 text-lg font-medium">
+                  Bạn chưa có bộ từ vựng nào. Hãy tạo bộ đầu tiên ở trên nhé!
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {decks.map((deck) => (
                   <div
                     key={deck._id}
-                    className="group bg-white/70 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white hover:shadow-xl hover:shadow-purple-200/50 transition-all hover:-translate-y-1 relative overflow-hidden"
+                    className="group bg-white/40 backdrop-blur-xl border border-white/50 rounded-3xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 relative overflow-hidden"
                   >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-pink-200/40 to-purple-200/40 rounded-full blur-2xl -mr-16 -mt-16 transition-transform group-hover:scale-150"></div>
-                    <div className="flex justify-between items-start relative z-10">
-                      <div>
-                        <h3 className="text-xl font-black text-gray-800 font-title mb-1 group-hover:text-purple-700 transition-colors">
-                          {deck.title}
-                        </h3>
-                        <p className="text-sm font-medium text-purple-500 bg-purple-50 inline-block px-3 py-1 rounded-full mt-2">
-                          {deck.cards?.length || 0} thẻ từ
-                        </p>
-                      </div>
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-300 to-purple-300 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="flex justify-between items-start mb-4">
+                      <h3 className="text-2xl font-bold font-title text-gray-800">
+                        {deck.title}
+                      </h3>
                       <button
-                        onClick={() => handleDeleteDeck(deck._id)}
-                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        title="Xóa bộ từ"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDeck(deck._id);
+                        }}
+                        className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors"
                       >
                         <Trash2 size={18} />
                       </button>
                     </div>
-
-                    <div className="flex gap-3 mt-6 relative z-10">
+                    <p className="text-sm font-medium text-purple-600 bg-purple-100/50 inline-block px-3 py-1 rounded-full mb-6 border border-purple-200">
+                      {deck.cards.length} thẻ từ
+                    </p>
+                    <div className="flex gap-3 mt-auto">
                       <button
-                        onClick={() => {
-                          setActiveDeckId(deck._id);
-                          setCurrentView("edit");
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-purple-50 text-purple-700 font-bold hover:bg-purple-100 transition-colors"
-                      >
-                        Chỉnh sửa
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!deck.cards || deck.cards.length === 0) {
-                            alert("Vui lòng thêm từ vựng trước khi học!");
-                            return;
-                          }
-                          setActiveDeckId(deck._id);
-                          setCardIndex(0);
-                          setIsFlipped(false);
-                          setCurrentView("study");
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold hover:shadow-lg hover:shadow-purple-500/30 transition-all"
+                        onClick={() => startStudy(deck._id)}
+                        disabled={deck.cards.length === 0}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold transition-all shadow-md ${
+                          deck.cards.length === 0
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-white text-pink-600 hover:bg-pink-50 border border-pink-100"
+                        }`}
                       >
                         <BookOpen size={18} /> Học ngay
                       </button>
+                      <button
+                        onClick={() => editDeck(deck._id)}
+                        className="px-4 py-3 bg-white/60 hover:bg-white text-gray-600 rounded-2xl font-bold border border-white/50 transition-all shadow-md"
+                      >
+                        Chỉnh sửa
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* --- CHẾ ĐỘ HỌC (STUDY) --- */}
+        {/* CHẾ ĐỘ HỌC (STUDY MODE - 3D FLIP TỪ OLDBUTNOGG) */}
         {currentView === "study" && activeDeck && (
-          <div className="space-y-8 animate-in fade-in duration-500 max-w-2xl mx-auto">
-            <div className="flex justify-between items-center bg-white/50 backdrop-blur-md px-6 py-4 rounded-2xl border border-white shadow-sm">
-              <button
-                onClick={() => setCurrentView("home")}
-                className="flex items-center gap-2 text-purple-600 font-bold hover:text-purple-800 transition-colors"
-              >
-                <ArrowLeft size={20} /> Thoát
-              </button>
-              <div className="text-center">
-                <h2 className="text-lg font-black text-gray-800 font-title">
-                  {activeDeck.title}
-                </h2>
-                <div className="text-sm font-bold text-purple-500">
-                  {cardIndex + 1} / {activeDeck.cards.length}
-                </div>
-              </div>
-              <div className="w-20"></div> {/* Spacer */}
+          <div className="animate-fade-in max-w-3xl mx-auto mt-4">
+            <button
+              onClick={() => setCurrentView("home")}
+              className="mb-6 flex items-center gap-2 text-gray-600 hover:text-pink-600 font-bold transition-colors bg-white/40 px-4 py-2 rounded-xl backdrop-blur-md border border-white/50 shadow-sm inline-flex"
+            >
+              <ArrowLeft size={20} /> Quay lại
+            </button>
+
+            <div className="mb-6 flex justify-between items-end">
+              <h2 className="text-3xl font-bold font-title text-gray-800">
+                {activeDeck.title}
+              </h2>
+              <span className="text-sm font-bold text-purple-600 bg-purple-100/50 px-4 py-1.5 rounded-full border border-purple-200">
+                {cardIndex + 1} / {activeDeck.cards.length}
+              </span>
             </div>
 
-            {/* Thẻ từ lật 3D */}
+            {/* VÙNG CHỨA THẺ 3D */}
             <div
-              className="relative w-full aspect-[4/3] md:aspect-[16/9] cursor-pointer group [perspective:1000px]"
+              className="relative w-full aspect-[4/3] sm:aspect-[16/9] [perspective:1000px] mb-8 group cursor-pointer"
               onClick={() => setIsFlipped(!isFlipped)}
             >
               <div
-                className={`w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${
-                  isFlipped ? "[transform:rotateX(180deg)]" : ""
+                className={`w-full h-full relative duration-500 [transform-style:preserve-3d] transition-transform ${
+                  isFlipped ? "[transform:rotateY(180deg)]" : ""
                 }`}
               >
-                {/* Mặt trước (Hàn) */}
-                <div className="absolute inset-0 [backface-visibility:hidden] bg-white rounded-[2rem] shadow-xl border-2 border-purple-100 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-br from-white to-purple-50/50">
-                  <div className="absolute top-6 right-6 text-purple-300">
-                    <RotateCcw size={24} className="opacity-50" />
-                  </div>
-                  <span className="text-5xl md:text-7xl font-black text-purple-900 mb-6 drop-shadow-sm">
+                {/* MẶT TRƯỚC (TIẾNG HÀN) */}
+                <div className="absolute w-full h-full bg-white/70 backdrop-blur-2xl border-2 border-white/80 rounded-[2rem] shadow-2xl p-8 flex flex-col items-center justify-center [backface-visibility:hidden]">
+                  <p className="text-sm font-bold text-pink-400 mb-4 tracking-widest uppercase">
+                    Từ vựng
+                  </p>
+                  <h3 className="text-6xl sm:text-7xl font-black text-gray-800 mb-6 drop-shadow-sm font-sans text-center leading-tight">
                     {activeDeck.cards[cardIndex].korean}
-                  </span>
+                  </h3>
                   {activeDeck.cards[cardIndex].romaji && (
-                    <span className="text-xl md:text-2xl font-bold text-purple-400 tracking-widest uppercase">
+                    <p className="text-xl text-gray-400 font-medium">
                       [{activeDeck.cards[cardIndex].romaji}]
-                    </span>
+                    </p>
                   )}
+                  <p className="absolute bottom-6 text-gray-300 text-sm flex items-center gap-2">
+                    <RotateCcw size={14} /> Chạm hoặc Space để lật
+                  </p>
                 </div>
 
-                {/* Mặt sau (Việt) */}
-                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateX(180deg)] bg-gradient-to-br from-purple-600 to-pink-500 rounded-[2rem] shadow-xl shadow-purple-500/20 flex flex-col items-center justify-center p-8 text-center border border-white/20">
-                  <div className="absolute top-6 right-6 text-white/50">
-                    <RotateCcw size={24} />
-                  </div>
-                  <span className="text-4xl md:text-5xl font-black text-white font-title mb-6 drop-shadow-md">
+                {/* MẶT SAU (TIẾNG VIỆT) */}
+                <div className="absolute w-full h-full bg-gradient-to-br from-pink-50 to-purple-50 backdrop-blur-2xl border-2 border-white/80 rounded-[2rem] shadow-2xl p-8 flex flex-col items-center justify-center [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                  <p className="text-sm font-bold text-purple-400 mb-4 tracking-widest uppercase">
+                    Nghĩa Tiếng Việt
+                  </p>
+                  <h3 className="text-4xl sm:text-5xl font-bold font-title text-purple-900 mb-6 text-center leading-relaxed">
                     {activeDeck.cards[cardIndex].viet}
-                  </span>
+                  </h3>
                   {activeDeck.cards[cardIndex].note && (
-                    <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-2xl text-white/90 font-medium mt-4 max-w-xs text-sm md:text-base border border-white/10">
-                      {activeDeck.cards[cardIndex].note}
+                    <div className="mt-4 p-4 bg-white/60 border border-white/80 rounded-2xl w-full max-w-md shadow-sm">
+                      <p className="text-sm text-gray-500 font-bold mb-1 uppercase text-center">
+                        Ghi chú
+                      </p>
+                      <p className="text-gray-700 text-center italic">
+                        {activeDeck.cards[cardIndex].note}
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Điều khiển chuyển thẻ */}
-            <div className="flex justify-center items-center gap-6 mt-8">
+            {/* ĐIỀU HƯỚNG BÀI HỌC */}
+            <div className="flex justify-center items-center gap-6">
               <button
-                onClick={() => {
-                  setIsFlipped(false);
-                  setCardIndex(
-                    (prev) =>
-                      (prev - 1 + activeDeck.cards.length) %
-                      activeDeck.cards.length
-                  );
-                }}
-                className="p-4 bg-white/80 backdrop-blur-sm text-purple-600 rounded-full shadow-sm hover:shadow-md hover:bg-white hover:text-purple-800 transition-all hover:-translate-x-1"
+                onClick={prevCard}
+                disabled={cardIndex === 0}
+                className="p-4 rounded-2xl bg-white/60 backdrop-blur-md border border-white/50 text-gray-600 hover:text-pink-600 hover:bg-white disabled:opacity-30 transition-all shadow-md hover:scale-105"
               >
                 <ArrowLeft size={24} />
               </button>
-
-              <div className="text-sm font-medium text-gray-400 bg-white/50 px-4 py-2 rounded-full border border-white">
-                Dùng{" "}
-                <kbd className="font-sans px-2 py-1 bg-white rounded shadow-sm text-purple-600 font-bold mx-1">
-                  Space
-                </kbd>{" "}
-                và{" "}
-                <kbd className="font-sans px-2 py-1 bg-white rounded shadow-sm text-purple-600 font-bold mx-1">
-                  ←
-                </kbd>{" "}
-                <kbd className="font-sans px-2 py-1 bg-white rounded shadow-sm text-purple-600 font-bold mx-1">
-                  →
-                </kbd>
-              </div>
-
               <button
-                onClick={() => {
-                  setIsFlipped(false);
-                  setCardIndex((prev) => (prev + 1) % activeDeck.cards.length);
-                }}
-                className="p-4 bg-white/80 backdrop-blur-sm text-purple-600 rounded-full shadow-sm hover:shadow-md hover:bg-white hover:text-purple-800 transition-all hover:translate-x-1"
+                onClick={nextCard}
+                disabled={cardIndex === activeDeck.cards.length - 1}
+                className="p-4 rounded-2xl bg-white/60 backdrop-blur-md border border-white/50 text-gray-600 hover:text-pink-600 hover:bg-white disabled:opacity-30 transition-all shadow-md hover:scale-105"
               >
                 <ArrowRight size={24} />
               </button>
@@ -468,156 +464,155 @@ export default function App() {
           </div>
         )}
 
-        {/* --- CHẾ ĐỘ CHỈNH SỬA (EDIT) --- */}
+        {/* CHẾ ĐỘ CHỈNH SỬA (EDIT MODE) */}
         {currentView === "edit" && activeDeck && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex items-center gap-4 bg-white/50 backdrop-blur-md px-6 py-4 rounded-2xl border border-white shadow-sm">
-              <button
-                onClick={() => setCurrentView("home")}
-                className="p-2 text-purple-600 hover:bg-purple-100 rounded-xl transition-colors"
-              >
-                <ArrowLeft size={24} />
-              </button>
-              <h2 className="text-2xl font-black text-gray-800 font-title flex-1">
-                Chỉnh sửa:{" "}
-                <span className="text-purple-600">{activeDeck.title}</span>
-              </h2>
+          <div className="animate-fade-in max-w-5xl mx-auto bg-white/40 backdrop-blur-xl border border-white/50 p-6 md:p-8 rounded-[2rem] shadow-2xl">
+            <div className="flex justify-between items-center mb-8 border-b border-white/50 pb-6">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setCurrentView("home")}
+                  className="p-2 bg-white/60 hover:bg-white rounded-xl text-gray-500 hover:text-pink-600 transition-colors shadow-sm"
+                >
+                  <ArrowLeft size={24} />
+                </button>
+                <h2 className="text-3xl font-bold font-title text-gray-800">
+                  Sửa: {activeDeck.title}
+                </h2>
+              </div>
+              <span className="bg-white/60 px-4 py-2 rounded-xl text-purple-600 font-bold border border-white">
+                Tổng: {activeDeck.cards.length} thẻ
+              </span>
             </div>
 
-            <div className="bg-white/70 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-lg border border-white">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-600 mb-2 ml-1">
-                    Tiếng Hàn *
+            {/* FORM THÊM TỪ MỚI */}
+            <div className="bg-white/60 rounded-3xl p-6 mb-10 shadow-inner border border-white/80 relative">
+              <h3 className="text-lg font-bold text-pink-600 mb-4 flex items-center gap-2">
+                <Plus size={20} /> Thêm Thẻ Mới
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase ml-2">
+                    Từ Tiếng Hàn *
                   </label>
                   <input
                     type="text"
+                    className="w-full bg-white/80 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-300 shadow-sm"
                     value={newCard.korean}
                     onChange={(e) =>
                       setNewCard({ ...newCard, korean: e.target.value })
                     }
-                    className="w-full bg-white border-2 border-purple-100 px-4 py-3 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-400/20 outline-none transition-all font-medium text-lg"
-                    placeholder="VD: 안녕하세요"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-600 mb-2 ml-1">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase ml-2">
                     Phiên âm (Tùy chọn)
                   </label>
                   <input
                     type="text"
+                    className="w-full bg-white/80 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-300 shadow-sm"
                     value={newCard.romaji}
                     onChange={(e) =>
                       setNewCard({ ...newCard, romaji: e.target.value })
                     }
-                    className="w-full bg-white border-2 border-purple-100 px-4 py-3 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-400/20 outline-none transition-all font-medium"
-                    placeholder="VD: annyeonghaseyo"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-gray-600 mb-2 ml-1">
-                    Nghĩa tiếng Việt *
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase ml-2">
+                    Nghĩa Tiếng Việt *
                   </label>
                   <input
                     type="text"
+                    className="w-full bg-white/80 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-300 shadow-sm"
                     value={newCard.viet}
                     onChange={(e) =>
                       setNewCard({ ...newCard, viet: e.target.value })
                     }
-                    className="w-full bg-white border-2 border-purple-100 px-4 py-3 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-400/20 outline-none transition-all font-medium text-lg"
-                    placeholder="VD: Xin chào"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-gray-600 mb-2 ml-1">
-                    Ghi chú / Ví dụ (Tùy chọn)
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase ml-2">
+                    Ghi chú (Ví dụ, Loại từ...)
                   </label>
-                  <textarea
+                  <input
+                    type="text"
+                    className="w-full bg-white/80 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-300 shadow-sm"
                     value={newCard.note}
                     onChange={(e) =>
                       setNewCard({ ...newCard, note: e.target.value })
                     }
-                    className="w-full bg-white border-2 border-purple-100 px-4 py-3 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-400/20 outline-none transition-all font-medium resize-none"
-                    rows="2"
-                    placeholder="Thêm ngữ cảnh hoặc ví dụ câu..."
+                    onKeyPress={(e) => e.key === "Enter" && handleAddCard()}
                   />
                 </div>
               </div>
 
               <div className="flex justify-end items-center gap-4">
                 {saveStatus === "saving" && (
-                  <span className="text-purple-500 font-bold text-sm animate-pulse">
-                    Đang lưu...
+                  <span className="text-blue-500 flex items-center gap-1">
+                    <RotateCcw size={16} className="animate-spin" /> Đang lưu...
                   </span>
                 )}
                 {saveStatus === "saved" && (
-                  <span className="text-green-500 font-bold text-sm flex items-center gap-1">
-                    <Check size={16} /> Đã lưu
+                  <span className="text-green-500 flex items-center gap-1">
+                    <Check size={16} /> Đã lưu!
                   </span>
                 )}
                 {saveStatus === "error" && (
-                  <span className="text-red-500 font-bold text-sm flex items-center gap-1">
+                  <span className="text-red-500 flex items-center gap-1">
                     <X size={16} /> Lỗi lưu
                   </span>
                 )}
+
                 <button
-                  onClick={() => handleAddCard(activeDeck._id)}
-                  disabled={!newCard.korean.trim() || !newCard.viet.trim()}
-                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white px-8 py-3.5 rounded-xl font-bold hover:shadow-lg hover:shadow-purple-500/30 disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                  onClick={handleAddCard}
+                  className="bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-pink-200 transition-transform transform hover:scale-105"
                 >
-                  <Save size={20} /> Thêm thẻ từ
+                  <Save size={18} /> Thêm Thẻ
                 </button>
               </div>
             </div>
 
-            {/* List of cards */}
-            <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-white shadow-sm overflow-hidden mt-8">
-              <div className="px-6 py-4 border-b border-purple-100/50 bg-white/40">
-                <h3 className="font-bold text-gray-700">
-                  Danh sách thẻ từ ({activeDeck.cards?.length || 0})
-                </h3>
-              </div>
-
-              {!activeDeck.cards || activeDeck.cards.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 font-medium">
-                  Chưa có thẻ từ nào trong bộ này.
+            {/* DANH SÁCH THẺ HIỆN TẠI */}
+            <div>
+              <h3 className="text-lg font-bold text-gray-700 mb-4">
+                Danh Sách Thẻ Trong Bộ
+              </h3>
+              {activeDeck.cards.length === 0 ? (
+                <div className="text-center py-10 bg-white/30 rounded-2xl border border-white/50 border-dashed">
+                  <p className="text-gray-400 italic">
+                    Chưa có thẻ nào. Hãy thêm từ vựng mới ở trên nhé!
+                  </p>
                 </div>
               ) : (
-                <div className="divide-y divide-purple-100/50">
-                  {activeDeck.cards.map((card) => (
+                <div className="space-y-3">
+                  {activeDeck.cards.map((card, idx) => (
                     <div
                       key={card.id}
-                      className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-white/50 transition-colors group"
+                      className="group bg-white/60 hover:bg-white backdrop-blur-sm border border-white/80 rounded-2xl p-4 flex items-center justify-between transition-all shadow-sm hover:shadow-md"
                     >
-                      <div className="flex items-center gap-4 flex-1">
-                        <span className="text-xl font-black text-purple-950">
-                          {card.korean}
+                      <div className="flex items-center gap-6 overflow-hidden">
+                        <span className="text-gray-400 font-bold w-6 text-center">
+                          {idx + 1}
                         </span>
-                        {card.romaji ? (
-                          <span className="text-sm text-gray-400 font-bold tracking-wide">
-                            [{card.romaji}]
+                        <div className="flex gap-4 items-baseline min-w-0">
+                          <span className="text-xl font-black text-purple-900 truncate">
+                            {card.korean}
                           </span>
-                        ) : (
-                          <span className="hidden md:inline text-gray-300">
-                            -
+                          <span className="text-sm font-bold text-gray-800 font-title truncate">
+                            {card.viet}
                           </span>
-                        )}
-                        <span className="text-base font-bold text-gray-800 font-title">
-                          {card.viet}
-                        </span>
-                      </div>
-
-                      {card.note && (
-                        <div className="hidden lg:block text-xs text-gray-500 bg-white/50 px-3 py-1.5 rounded-lg max-w-xs truncate border border-white">
-                          {card.note}
+                          {card.romaji && (
+                            <span className="hidden md:inline text-xs text-gray-400 font-bold tracking-wide border border-gray-200 px-2 py-0.5 rounded-md">
+                              {card.romaji}
+                            </span>
+                          )}
                         </div>
-                      )}
+                      </div>
 
                       <button
                         onClick={() =>
                           handleDeleteCard(activeDeck._id, card.id)
                         }
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                         title="Xóa thẻ từ"
                       >
                         <Trash2 size={18} />
