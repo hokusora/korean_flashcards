@@ -9,37 +9,46 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
-const API_URL = "https://flashcard-backend-aa18.onrender.com";
+// ĐÃ SỬA: Thêm chính xác /api/decks vào cuối đường link API
+const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
 
 export default function App() {
   const [decks, setDecks] = useState([]);
   const [currentView, setCurrentView] = useState("home"); // "home" | "edit" | "study"
-  const [activeDeckId, setActiveDeckId] = useState(null); // ← FIX BUG 5: lưu ID thay vì object
+  const [activeDeckId, setActiveDeckId] = useState(null); // Lưu ID thay vì object
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [saveStatus, setSaveStatus] = useState(""); // "" | "saving" | "saved" | "error"
 
-  // Lấy activeDeck từ decks state (luôn mới nhất)  ← FIX BUG 5
+  // Lấy activeDeck từ decks state (luôn mới nhất)
   const activeDeck = decks.find((d) => d._id === activeDeckId) || null;
 
   // ==========================================
-  // TẢI DỮ LIỆU KHI KHỞI ĐỘNG
+  // TẢI DỮ LIỆU KHI KHỞI ĐỘNG (Đã thêm hàm bảo vệ chống trắng màn hình)
   // ==========================================
   useEffect(() => {
     const fetchDecks = async () => {
       try {
         const res = await axios.get(API_URL);
-        setDecks(res.data);
+        // Kiểm tra an toàn: Chỉ cập nhật nếu dữ liệu trả về chuẩn là một Mảng (Array)
+        if (Array.isArray(res.data)) {
+          setDecks(res.data);
+        } else {
+          console.error("Dữ liệu trả về không phải là mảng:", res.data);
+          setDecks([]); // Nếu không phải mảng thì cho mảng rỗng chứ không để sập giao diện
+        }
       } catch (err) {
-        console.error("Lỗi khi tải dữ liệu:", err);
+        console.error("Lỗi khi tải dữ liệu từ Render:", err);
+        setDecks([]);
       }
     };
     fetchDecks();
   }, []);
 
-  // ==========================================
+  // ... TẤT CẢ CÁC HÀM XỬ LÝ PHÍA DƯỚI CỦA FILE APP.JSX GIỮ NGUYÊN KHÔNG ĐỔI
+
   // HÀM HELPER — HIỂN THỊ TRẠNG THÁI LƯU
-  // ==========================================
+
   const showSaveStatus = (status) => {
     setSaveStatus(status);
     if (status === "saved") setTimeout(() => setSaveStatus(""), 2000);
