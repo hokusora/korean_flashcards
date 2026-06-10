@@ -2,11 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 1. Khai báo Font Tiêu đề */
+@font-face {
+  font-family: "SVN-Busan Garden";
+  src: url("./assets/fonts/BusanGarden.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap; /* Giúp web hiển thị chữ ngay lập tức, không bị lag mất chữ khi mới load trang */
+}
+
+/* 2. Khai báo Font Nội dung */
+@font-face {
+  font-family: "ZFangelring";
+  src: url("./assets/fonts/ZFangelring_V.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 3. Áp dụng Font cho toàn bộ Web */
 body {
   background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
   min-height: 100vh;
-  font-family: 'Inter', sans-serif;
+  font-family: "ZFangelring", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased; /* Làm mịn chữ trên nền macOS và trình duyệt Chromium */
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Ép các thẻ tiêu đề dùng Font riêng */
+h1,
+h2,
+h3,
+.font-title {
+  font-family: "SVN-Busan Garden", sans-serif !important;
+}
+
+/* --- UTILITIES ĐÃ CÓ CỦA BẠN (GIỮ NGUYÊN) --- */
 
 /* Glassmorphism Utilities */
 .glass {
@@ -29,4 +61,19 @@ body {
 }
 .rotate-y-180 {
   transform: rotateY(180deg);
+}
+
+/* Hiệu ứng Fade In cho Modal Welcome mượt mà hơn */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
 }
