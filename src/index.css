@@ -77,3 +77,23 @@ h3,
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out forwards;
 }
+
+/* ==========================================
+   HIỆU ỨNG LẬT THẺ FLASHCARD 3D
+   ========================================== */
+.perspective {
+  perspective: 1000px;
+}
+
+.transform-style {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
