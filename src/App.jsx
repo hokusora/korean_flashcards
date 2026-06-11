@@ -1,4 +1,3 @@
-// ============================================================
 //  K-VOCAB STUDY LAB — App.jsx (PHIÊN BẢN HOÀN CHỈNH + NOTEBOOK NOTE + SCROLL REVEAL)
 //  + Tích hợp Personalization Panel (Floating Settings)
 //  + Điều khiển màu sắc & font chữ toàn bộ app qua CSS Variables
@@ -6,7 +5,6 @@
 //  + BỔ SUNG: Khung "Ghi chú / Ví dụ" dạng Notebook có scroll, hỗ trợ **bold**, *italic*
 //  + BỔ SUNG: Hiệu ứng ScrollReveal (fade-in + translateY) khi cuộn đến deck card
 //  + BỔ SUNG: Hover effect nhấc bồng bềnh + shadow pastel cho card
-// ============================================================
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { GoogleLogin } from "@react-oauth/google";
@@ -31,19 +29,30 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+const SVG_TEMPLATE = (
+  <span
+    style={{
+      display: "inline-block",
+      fontSize: "inherit",
+      lineHeight: 1,
+      textShadow:
+        "0 0 6px rgba(255,255,255,0.8), 0 0 12px rgba(200,200,255,0.5)",
+      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
+    }}
+  >
+    ❄️
+  </span>
+);
+
 // ────────────────────────────────────────────────────────────
 //  ENDPOINT API — thay URL nếu bạn đổi backend
 // ────────────────────────────────────────────────────────────
-const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
-// Khi chạy trên máy mình (Local) thì mở dòng dưới, khóa dòng Render lại:
-//const API_URL = "http://localhost:5000";
-
-// Khi nào cần deploy lên GitHub Pages thì lại khóa dòng trên, mở dòng dưới:
-
+//const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
+const API_URL = "http://localhost:5000";
 // ════════════════════════════════════════════════════════════
 //  CSS GLOBAL + CSS VARIABLES (màu mặc định - Pink Dream)
 //  BỔ SUNG: biến cho khung note dạng Notebook
-// ════════════════════════════════════════════════════════════
+
 const GLOBAL_STYLE = `
   :root {
     /* 🎨 CUSTOM VARIABLE — NỀN TRANG (gradient 3 màu) */
@@ -149,6 +158,25 @@ const GLOBAL_STYLE = `
   @keyframes floatUp {
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(-4px); }
+  }
+
+  /* ══ HOA PNG RƠI V2 — KEYFRAMES (nhúng vào GLOBAL_STYLE để override nếu cần) ══
+     petal-fall-v2: rơi TÂY BẮC → ĐÔNG NAM (xuống + sang phải)
+     translateX dùng var(--drift) được truyền inline từ JS trên mỗi bông hoa.
+     ─────────────────────────────────────────────────────────────────────────── */
+  @keyframes petal-fall-v2 {
+    0%   { top: -12%; transform: translateX(0); }
+    /* Tùy chỉnh: thay var(--drift) = số vw để đổi mức "gió thổi nghiêng" */
+    100% { top: 108%; transform: translateX(var(--drift, 10vw)); }
+  }
+
+  /* petal-sway-v2: đung đưa qua lại + xoay 3D nhẹ trong không khí */
+  @keyframes petal-sway-v2 {
+    0%   { transform: translateX(0px)   rotateZ(0deg)   rotateY(0deg); }
+    25%  { transform: translateX(18px)  rotateZ(8deg)   rotateY(15deg); }
+    50%  { transform: translateX(-12px) rotateZ(-5deg)  rotateY(-10deg); }
+    75%  { transform: translateX(22px)  rotateZ(12deg)  rotateY(20deg); }
+    100% { transform: translateX(-8px)  rotateZ(-8deg)  rotateY(-15deg); }
   }
 
   /* ========== KIỂU NOTEBOOK CHO GHI CHÚ (scroll, glass, pastel) ========== */
@@ -360,34 +388,89 @@ export default function App() {
     },
   };
 
-  // --- State cho hiệu ứng rơi (thay thế hoàn toàn code cũ) ---
+  // ═══════════════════════════════════════════════════════════
+  //  HOA / SNOWFLAKE PNG RƠI — V2 (LOFI DEPTH-OF-FIELD)
+  //  Để dùng ảnh PNG riêng: thay đường dẫn trong PETAL_IMAGE_SRC
+  // ═══════════════════════════════════════════════════════════
+
+  // ── ĐỔI ĐƯỜNG DẪN ẢNH TẠI ĐÂY ──────────────────────────────
+  //    Đặt file .png vào thư mục src/assets/ rồi import, hoặc
+  //    dùng đường dẫn public như dưới đây.
+  //    Ví dụ: "/snowflake.png"  hoặc  "/cherry.png"
+  const PETAL_IMAGE_SRC = null; // ← null = dùng emoji ❄️ mặc định
+
+  // ── SỐ LƯỢNG HOA TRÊN MÀN HÌNH ─────────────────────────────
+  //    15–25 là sweet spot lofi. Tăng → dày hơn, giảm → thưa hơn.
+  const PETAL_COUNT = 20;
+
   const [petals, setPetals] = useState([]);
 
-  // Hàm tạo một petal với các giá trị ngẫu nhiên (kích thước, tốc độ, blur, opacity, vị trí)
-  const generatePetal = () => {
-    const size = Math.floor(Math.random() * 40) + 20;
-    const opacity = Math.random() * 0.5 + 0.4;
-    const blur = Math.random() * 2;
-    const fallDuration = Math.random() * 8 + 8;
-    const swayDuration = Math.random() * 4 + 3;
-    const delay = Math.random() * 5;
-    const left = Math.random() * 100;
-    return {
-      id: Math.random().toString(36).substring(2, 12),
-      size,
-      opacity,
-      blur,
-      fallDuration,
-      swayDuration,
-      delay,
-      left,
-    };
-  };
-
   useEffect(() => {
-    const maxPetals = 20;
-    const newPetals = Array.from({ length: maxPetals }, generatePetal);
-    setPetals(newPetals);
+    /**
+     * generatePetal() — tạo 1 bông hoa với thuộc tính ngẫu nhiên
+     *
+     * Depth-of-field được mô phỏng qua 3 lớp dựa trên `scale`:
+     *   scale > 1.0  → layer-near  (hoa to, gần ống kính, blur bokeh trước)
+     *   scale 0.6–1.0 → layer-mid  (hoa vừa, trong focus, sắc nét nhất)
+     *   scale < 0.6  → layer-far   (hoa nhỏ, xa phía sau, blur nhẹ)
+     */
+    const generatePetal = () => {
+      // ── KÍCH THƯỚC ─────────────────────────────────────────
+      //    Dải: 0.35 → 1.35 (tương đương ~8px đến ~33px ở base 24px)
+      //    Tùy chỉnh: thay 0.35 (min) và 1.0 (range) theo ý muốn
+      const scale = Math.random() * 1.0 + 0.35;
+
+      // ── XẾP LỚP DEPTH-OF-FIELD ─────────────────────────────
+      let depthLayer;
+      if (scale > 1.0) depthLayer = "layer-near"; // gần, to
+      else if (scale >= 0.6) depthLayer = "layer-mid"; // trong focus
+      else depthLayer = "layer-far"; // xa, nhỏ
+
+      // ── ĐỘ MỜ (OPACITY) ────────────────────────────────────
+      //    Hoa xa mờ hơn để tăng cảm giác chiều sâu
+      //    layer-far: 0.25–0.45 | layer-mid: 0.5–0.75 | layer-near: 0.4–0.65
+      let opacity;
+      if (depthLayer === "layer-far") opacity = Math.random() * 0.2 + 0.25;
+      else if (depthLayer === "layer-mid") opacity = Math.random() * 0.25 + 0.5;
+      else opacity = Math.random() * 0.25 + 0.4;
+
+      // ── ĐIỂM XUẤT PHÁT THEO HƯỚNG TÂY BẮC → ĐÔNG NAM ──────
+      //    Hoa bắt đầu từ 0–80% màn hình ngang (nghiêng về bên trái)
+      //    vì gió thổi sang phải → hoa bắt đầu từ nửa trái
+      const startLeft = Math.random() * 80; // 0 → 80vw
+
+      // ── DỊCH CHUYỂN NGANG TỔNG CỘNG (hướng TÂY BẮC → ĐÔNG NAM) ──
+      //    Hoa rơi xuống đồng thời trôi sang phải thêm 5–18% màn hình
+      //    Tùy chỉnh: tăng số để hướng gió mạnh hơn
+      const horizontalDrift = Math.random() * 13 + 5; // vw, dịch sang phải
+
+      // ── TỐC ĐỘ RƠI ─────────────────────────────────────────
+      //    BÍ QUYẾT LOFI: chậm = chill. Dải 8s–16s là lý tưởng.
+      //    Tùy chỉnh:
+      //      Muốn chậm hơn → tăng số đầu (min) và số sau (range)
+      //      Muốn nhanh hơn → giảm cả 2 số
+      //    Gợi ý: 8–16s = lofi chill | 4–8s = mùa đông | 2–4s = bão tuyết
+      const fallDuration = Math.random() * 8 + 8; // ← CHỈNH TỐC ĐỘ RƠI TẠI ĐÂY
+
+      // ── TỐC ĐỘ ĐUNG ĐƯA (SWAY) ─────────────────────────────
+      //    Sway nhanh hơn fall 1 chút → tự nhiên hơn
+      //    Tùy chỉnh: 3–5s = gió nhẹ | 1.5–3s = gió vừa
+      const swayDuration = Math.random() * 2 + 3; // ← CHỈNH NHỊP ĐUNG ĐƯA TẠI ĐÂY
+
+      return {
+        id: Math.random().toString(36).substring(2, 10),
+        startLeft, // vị trí ngang xuất phát (vw)
+        horizontalDrift, // tổng dịch chuyển ngang xuống hết màn hình (vw)
+        scale, // tỉ lệ kích thước (0.35 → 1.35)
+        opacity, // độ mờ tính theo lớp depth
+        depthLayer, // "layer-near" | "layer-mid" | "layer-far"
+        fallDuration, // giây rơi từ đỉnh xuống đáy
+        swayDuration, // giây cho 1 chu kỳ sway
+        delay: Math.random() * 6, // delay ngẫu nhiên 0–6s để không đồng bộ
+      };
+    };
+
+    setPetals(Array.from({ length: PETAL_COUNT }, generatePetal));
   }, []);
 
   // Áp dụng CSS Variables
@@ -483,14 +566,12 @@ export default function App() {
     try {
       setSaveStatus("saving");
       const emailParam = user?.email || "guest";
-      console.log("🔄 Fetching decks for:", emailParam);
       const res = await axios.get(`${API_URL}?userEmail=${emailParam}`);
-      console.log("✅ Decks received:", res.data);
       if (Array.isArray(res.data)) setDecks(res.data);
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus(""), 2000);
     } catch (err) {
-      console.error("❌ Lỗi tải dữ liệu:", err);
+      console.error("Lỗi tải dữ liệu:", err);
       setSaveStatus("error");
     }
   }, [user]);
@@ -734,27 +815,84 @@ export default function App() {
         background: `linear-gradient(135deg, var(--bg-gradient-from), var(--bg-gradient-via), var(--bg-gradient-to))`,
       }}
     >
-      {/* CHERRY BLOSSOM CONTAINER */}
-      {/* LỚP PHỦ CÁNH HOA RƠI (PNG) */}
-      <div className="petal-container">
+      {/* ══════════════════════════════════════════════════════
+          HOA / SNOWFLAKE PNG RƠI — V2 (LOFI DEPTH-OF-FIELD)
+          pointer-events: none trên cả container lẫn từng bông
+          → tuyệt đối không chặn click vào flashcard bên dưới
+          ══════════════════════════════════════════════════════ */}
+      <div className="petal-layer">
         {petals.map((petal) => (
           <div
             key={petal.id}
-            className="petal"
+            className={`petal-v2 ${petal.depthLayer}`}
             style={{
-              left: `${petal.left}vw`,
-              width: `${petal.size}px`,
-              height: `${petal.size}px`,
+              /* Vị trí ngang xuất phát */
+              left: `${petal.startLeft}vw`,
+
+              /* Kích thước — base 24px nhân với scale */
+              width: `${24 * petal.scale}px`,
+              height: `${24 * petal.scale}px`,
+
+              /* Depth-of-field opacity */
               opacity: petal.opacity,
-              filter: `blur(${petal.blur}px)`,
+
+              /* z-index theo lớp: near=3, mid=2, far=1
+                 → hoa to hiển thị "trước" hoa nhỏ */
+              zIndex:
+                petal.depthLayer === "layer-near"
+                  ? 3
+                  : petal.depthLayer === "layer-mid"
+                  ? 2
+                  : 1,
+
+              /* Animation kép: fall + sway chạy độc lập */
+              animationName: "petal-fall-v2, petal-sway-v2",
               animationDuration: `${petal.fallDuration}s, ${petal.swayDuration}s`,
-              animationDelay: `${petal.delay}s, ${petal.delay}s`,
-              // bạn có thể thêm transform nhẹ để cánh hoa nghiêng ngẫu nhiên
-              transform: `rotate(${Math.random() * 360}deg)`,
+              animationDelay: `${petal.delay}s, ${petal.delay * 0.7}s`,
+              animationTimingFunction: "linear, ease-in-out",
+              animationIterationCount: "infinite, infinite",
+              animationDirection: "normal, alternate",
+
+              /* Hướng TÂY BẮC → ĐÔNG NAM:
+                 translateX tuyến tính theo tiến trình rơi
+                 Dùng CSS custom property để truyền drift vào keyframe */
+              "--drift": `${petal.horizontalDrift}vw`,
             }}
           >
-            {/* THAY ĐƯỜNG DẪN ẢNH PNG CỦA BẠN VÀO ĐÂY */}
-            <span style={{ fontSize: "inherit" }}>❄️</span>
+            {/* Nếu có file PNG: dùng <img>. Không có: dùng emoji ❄️ */}
+            {PETAL_IMAGE_SRC ? (
+              <img
+                src={PETAL_IMAGE_SRC}
+                alt=""
+                draggable={false}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  userSelect: "none",
+                  /* Tint pastel hồng cho ảnh PNG trắng/xám:
+                     Xóa dòng filter bên dưới nếu ảnh đã có màu sắc riêng */
+                  filter: "hue-rotate(320deg) saturate(1.2) brightness(1.1)",
+                }}
+              />
+            ) : (
+              /* Fallback emoji ❄️ khi chưa có file PNG */
+              <span
+                style={{
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                  fontSize: `${24 * petal.scale}px`,
+                  lineHeight: 1,
+                  textAlign: "center",
+                  textShadow:
+                    "0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(200,200,255,0.4)",
+                  userSelect: "none",
+                }}
+              >
+                ❄️
+              </span>
+            )}
           </div>
         ))}
       </div>
