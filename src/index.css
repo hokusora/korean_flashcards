@@ -103,7 +103,7 @@ h3,
    ========================================= */
 
 /* Container bọc toàn bộ hoa */
-/* Container hoa tuyết */
+
 .cherry-blossom-container {
   position: fixed;
   top: 0;
@@ -123,9 +123,7 @@ h3,
   animation-iteration-count: infinite, infinite;
   animation-direction: normal, alternate;
   will-change: transform, top;
-  backface-visibility: hidden;
-  background: rgba(154, 226, 255, 0.83); /* TẠM THỜI - sẽ thấy khối trắng */
-  border-radius: 50%;
+  pointer-events: none;
 }
 
 /* Rơi từ trên xuống */
@@ -144,9 +142,9 @@ h3,
     transform: translateX(0px) rotate(0deg);
   }
   50% {
-    transform: translateX(35px) rotate(12deg);
+    transform: translateX(30px) rotate(10deg);
   }
   100% {
-    transform: translateX(-35px) rotate(24deg);
+    transform: translateX(-30px) rotate(20deg);
   }
 }
