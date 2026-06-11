@@ -124,6 +124,8 @@ h3,
   animation-direction: normal, alternate;
   will-change: transform, top;
   backface-visibility: hidden;
+  background: rgba(154, 226, 255, 0.83); /* TẠM THỜI - sẽ thấy khối trắng */
+  border-radius: 50%;
 }
 
 /* Rơi từ trên xuống */

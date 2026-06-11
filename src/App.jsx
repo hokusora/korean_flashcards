@@ -40,18 +40,14 @@ import snowflakeIcon from "./assets/icons/snowflake.png";
 const SVG_TEMPLATE = (
   <img
     src={snowflakeIcon}
-    alt="❄️"
+    alt="snowflake"
     style={{
       width: "100%",
       height: "100%",
       objectFit: "contain",
-      display: "block",
-      pointerEvents: "none",
-    }}
-    onError={(e) => {
-      e.target.onerror = null;
-      e.target.style.display = "none";
-      e.target.parentElement.innerHTML = "❄️"; // fallback ký tự
+      filter:
+        "drop-shadow(0 0 4px rgba(0,0,0,0.2)) drop-shadow(0 0 8px rgba(255,255,255,0.8))",
+      opacity: 0.9,
     }}
   />
 );
@@ -344,27 +340,27 @@ export default function App() {
   // ==========================================
   // VỊ TRÍ 2: LOGIC TẠO HOA TUYẾT RƠI RANDOM (ĐÃ TỐI ƯU CHO PNG)
 
-  const [petals, setPetals] = useState([]);
-
   useEffect(() => {
-    const maxPetals = 40;
+    const maxPetals = 30;
     const generatePetal = () => {
-      const size = Math.random() * 30 + 24; // 24px → 54px, rõ nét
-      const opacity = Math.random() * 0.6 + 0.4;
-      const fallDuration = Math.random() * 12 + 12; // 12s–24s rơi chậm
-      const swayDuration = Math.random() * 4 + 5; // 5s–9s đung đưa
-      const delay = Math.random() * 8; // delay tối đa 8s
+      const randomSize = Math.random() * 20 + 30; // 30px → 50px (to hơn)
+      const opacity = Math.random() * 0.5 + 0.5; // 0.5 → 1.0 (đậm hơn)
+      const randomFallDuration = Math.random() * 8 + 8; // 8s → 16s
+      const randomSwayDuration = Math.random() * 3 + 3; // 3s → 6s
+      const randomDelay = Math.random() * 3; // delay tối đa 3s (THAY ĐỔI QUAN TRỌNG)
+
       return {
         id: Math.random().toString(36).substring(2, 11),
         left: `${Math.random() * 100}vw`,
-        size,
-        opacity,
-        fallDuration,
-        swayDuration,
-        delay,
+        size: randomSize,
+        opacity: opacity,
+        fallDuration: randomFallDuration,
+        swayDuration: randomSwayDuration,
+        delay: randomDelay,
       };
     };
-    setPetals(Array.from({ length: maxPetals }, generatePetal));
+
+    setPetals(Array.from({ length: maxPetals }).map(generatePetal));
   }, []);
 
   // Áp dụng CSS Variables (bổ sung thêm biến notebook)
@@ -712,7 +708,7 @@ export default function App() {
         background: `linear-gradient(135deg, var(--bg-gradient-from), var(--bg-gradient-via), var(--bg-gradient-to))`,
       }}
     >
-      {/* sakura blossom */}
+      {/* CHERRY BLOSSOM CONTAINER - đặt ngay đây */}
       <div className="cherry-blossom-container">
         {petals.map((petal) => (
           <div
