@@ -336,43 +336,33 @@ export default function App() {
 
   // ==========================================
   // VỊ TRÍ 2: LOGIC TẠO HOA TUYẾT RƠI RANDOM (ĐÃ TỐI ƯU CHO PNG)
-  // ==========================================
+
   const [petals, setPetals] = useState([]);
 
   useEffect(() => {
-    const maxPetals = 20; // Số lượng bông tuyết xuất hiện cùng lúc
+    const maxPetals = 20;
 
     const generatePetal = () => {
-      // Kích thước ngẫu nhiên (từ 10px đến 25px)
-      const randomSize = Math.random() * 15 + 10;
+      // Tăng kích thước ngẫu nhiên to lên một chút (từ 18px đến 35px) để dễ nhìn
+      const randomSize = Math.random() * 17 + 18;
 
-      // Hiệu ứng độ sâu trường ảnh (Depth of Field)
-      // Bông tuyết nhỏ < 16px ở xa -> mờ ảo (blur) và mờ đục (opacity thấp)
-      const isDistant = randomSize < 16;
-      const blurAmount = isDistant ? Math.random() * 2 + 1.5 : 0;
-      const opacity = isDistant
-        ? Math.random() * 0.3 + 0.3
-        : Math.random() * 0.4 + 0.6;
+      // Giữ opacity nhẹ nhàng, loại bỏ hoàn toàn blurAmount để tránh bị mất ảnh PNG
+      const opacity = Math.random() * 0.4 + 0.6;
 
-      // Thời gian rơi chậm lofi (8 giây đến 16 giây từ đỉnh xuống đáy)
       const randomFallDuration = Math.random() * 8 + 8;
-
-      // Thời gian lắc lư theo gió nhẹ qua lại (3 giây đến 6 giây)
       const randomSwayDuration = Math.random() * 3 + 3;
 
       return {
         id: Math.random().toString(36).substring(2, 11),
-        left: `${Math.random() * 100}vw`, // Xuất hiện ngẫu nhiên theo chiều ngang màn hình
+        left: `${Math.random() * 100}vw`,
         size: randomSize,
-        blur: blurAmount,
         opacity: opacity,
         fallDuration: randomFallDuration,
         swayDuration: randomSwayDuration,
-        delay: Math.random() * 15, // Lùi thời gian bắt đầu rơi để rải rác tự nhiên
+        delay: Math.random() * 15,
       };
     };
 
-    // Khởi tạo danh sách bông tuyết rơi
     setPetals(Array.from({ length: maxPetals }).map(generatePetal));
   }, []);
 
@@ -732,13 +722,12 @@ export default function App() {
               width: `${petal.size}px`,
               height: `${petal.size}px`,
               opacity: petal.opacity,
-              filter: `blur(${petal.blur}px)`, // Giữ hiệu ứng mờ ảo chiều sâu 3D
-              animationDuration: `${petal.fallDuration}s, ${petal.swayDuration}s`, // Giữ nguyên tốc độ rơi chậm lofi
+              /* Bỏ dòng filter: blur cũ đi ở đây */
+              animationDuration: `${petal.fallDuration}s, ${petal.swayDuration}s`,
               animationDelay: `${petal.delay}s, ${petal.delay}s`,
             }}
           >
-            {SVG_TEMPLATE}{" "}
-            {/* Lúc này lõi bên trong đã tự động biến thành thẻ <img> chứa hoa tuyết của bạn */}
+            {SVG_TEMPLATE}
           </div>
         ))}
       </div>
