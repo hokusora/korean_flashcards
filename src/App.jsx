@@ -1,10 +1,10 @@
-//  K-VOCAB STUDY LAB — App.jsx (PHIÊN BẢN HOÀN CHỈNH + NOTEBOOK NOTE + SCROLL REVEAL)
+// ============================================================
+//  K-VOCAB STUDY LAB — App.jsx (PHIÊN BẢN HOÀN CHỈNH + NOTEBOOK NOTE)
 //  + Tích hợp Personalization Panel (Floating Settings)
 //  + Điều khiển màu sắc & font chữ toàn bộ app qua CSS Variables
 //  + Giữ nguyên mọi chức năng: sign-in, database, checklist, study, edit, v.v.
 //  + BỔ SUNG: Khung "Ghi chú / Ví dụ" dạng Notebook có scroll, hỗ trợ **bold**, *italic*
-//  + BỔ SUNG: Hiệu ứng ScrollReveal (fade-in + translateY) khi cuộn đến deck card
-//  + BỔ SUNG: Hover effect nhấc bồng bềnh + shadow pastel cho card
+// ============================================================
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { GoogleLogin } from "@react-oauth/google";
@@ -29,6 +29,19 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+// ==========================================
+// VỊ TRÍ 1: ICON HOA ANH ĐÀO
+// Đặt biến SVG_TEMPLATE này ở bên ngoài hàm App()
+// ==========================================
+// 1. Hãy thêm dòng import file ảnh này lên trên cùng file App.jsx (nằm cùng cụm với các dòng import lucide-react hay axios)
+//import snowflakeIcon from "./assets/icons/snowflake.png";
+
+// 2. Thay đổi hằng số biến mẫu thành thẻ img như dưới đây
+
+// Xóa dòng import snowflakeIcon (hoặc giữ lại nếu muốn fallback)
+// const SVG_TEMPLATE = <img src={snowflakeIcon} ... />;
+
+// Dùng ký tự tuyết với style đẹp
 const SVG_TEMPLATE = (
   <span
     style={{
@@ -49,10 +62,11 @@ const SVG_TEMPLATE = (
 // ────────────────────────────────────────────────────────────
 const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
 //const API_URL = "http://localhost:5000";
+
 // ════════════════════════════════════════════════════════════
 //  CSS GLOBAL + CSS VARIABLES (màu mặc định - Pink Dream)
 //  BỔ SUNG: biến cho khung note dạng Notebook
-
+// ════════════════════════════════════════════════════════════
 const GLOBAL_STYLE = `
   :root {
     /* 🎨 CUSTOM VARIABLE — NỀN TRANG (gradient 3 màu) */
@@ -160,25 +174,6 @@ const GLOBAL_STYLE = `
     50%       { transform: translateY(-4px); }
   }
 
-  /* ══ HOA PNG RƠI V2 — KEYFRAMES (nhúng vào GLOBAL_STYLE để override nếu cần) ══
-     petal-fall-v2: rơi TÂY BẮC → ĐÔNG NAM (xuống + sang phải)
-     translateX dùng var(--drift) được truyền inline từ JS trên mỗi bông hoa.
-     ─────────────────────────────────────────────────────────────────────────── */
-  @keyframes petal-fall-v2 {
-    0%   { top: -12%; transform: translateX(0); }
-    /* Tùy chỉnh: thay var(--drift) = số vw để đổi mức "gió thổi nghiêng" */
-    100% { top: 108%; transform: translateX(var(--drift, 10vw)); }
-  }
-
-  /* petal-sway-v2: đung đưa qua lại + xoay 3D nhẹ trong không khí */
-  @keyframes petal-sway-v2 {
-    0%   { transform: translateX(0px)   rotateZ(0deg)   rotateY(0deg); }
-    25%  { transform: translateX(18px)  rotateZ(8deg)   rotateY(15deg); }
-    50%  { transform: translateX(-12px) rotateZ(-5deg)  rotateY(-10deg); }
-    75%  { transform: translateX(22px)  rotateZ(12deg)  rotateY(20deg); }
-    100% { transform: translateX(-8px)  rotateZ(-8deg)  rotateY(-15deg); }
-  }
-
   /* ========== KIỂU NOTEBOOK CHO GHI CHÚ (scroll, glass, pastel) ========== */
   .notebook-note {
     background: var(--notebook-bg);
@@ -217,18 +212,6 @@ const GLOBAL_STYLE = `
     color: #9268f2;
     font-style: italic;
   }
-
-  /* ========== SCROLL REVEAL ANIMATION (mới) ========== */
-  .reveal-card {
-    opacity: 0;
-    transform: translateY(30px);
-    transition: opacity 0.7s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.7s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-    will-change: opacity, transform;
-  }
-  .reveal-card.revealed {
-    opacity: 1;
-    transform: translateY(0);
-  }
 `;
 
 // Inject global style (chỉ 1 lần)
@@ -247,6 +230,7 @@ if (
 // ════════════════════════════════════════════════════════════
 const renderSimpleMarkdown = (text) => {
   if (!text) return null;
+  // Tạm thời chuyển đổi **bold** và *italic* nhưng không ảnh hưởng HTML khác
   const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
   return parts.map((part, idx) => {
     if (part.startsWith("**") && part.endsWith("**")) {
@@ -256,39 +240,6 @@ const renderSimpleMarkdown = (text) => {
     }
     return part;
   });
-};
-
-// ════════════════════════════════════════════════════════════
-//  CUSTOM HOOK: useScrollReveal (Intersection Observer)
-// ════════════════════════════════════════════════════════════
-const useScrollReveal = (
-  selector,
-  threshold = 0.15,
-  rootMargin = "0px 0px -50px 0px"
-) => {
-  useEffect(() => {
-    const elements = document.querySelectorAll(selector);
-    if (elements.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
-            observer.unobserve(entry.target); // chỉ reveal một lần
-          }
-        });
-      },
-      { threshold, rootMargin }
-    );
-
-    elements.forEach((el) => observer.observe(el));
-
-    return () => {
-      elements.forEach((el) => observer.unobserve(el));
-      observer.disconnect();
-    };
-  }, [selector, threshold, rootMargin]);
 };
 
 // ════════════════════════════════════════════════════════════
@@ -342,7 +293,7 @@ export default function App() {
     "ZFangelring, -apple-system, BlinkMacSystemFont, sans-serif"
   );
 
-  // Preset palettes
+  // Preset palettes (giữ nguyên)
   const palettes = {
     "Pink Dream": {
       bgFrom: "#fbcfe8",
@@ -388,15 +339,13 @@ export default function App() {
     },
   };
 
-  // ═══════════════════════════════════════════════════════════
-  //  HOA / SNOWFLAKE PNG RƠI — V2 (LOFI DEPTH-OF-FIELD)
-  //  Để dùng ảnh PNG riêng: thay đường dẫn trong PETAL_IMAGE_SRC
-  // ═══════════════════════════════════════════════════════════
+  // ==========================================
+  // VỊ TRÍ 2: LOGIC TẠO HOA RƠI RANDOM
+  // Đặt đoạn này ngay đầu hàm App() hoặc cùng cụm với các khai báo useState
 
-  // ── ĐỔI ĐƯỜNG DẪN ẢNH TẠI ĐÂY ──────────────────────────────
-  //    Đặt file .png vào thư mục src/assets/ rồi import, hoặc
-  //    dùng đường dẫn public như dưới đây.
-  //    Ví dụ: "/snowflake.png"  hoặc  "/cherry.png"
+  // ==========================================
+  // VỊ TRÍ 2: LOGIC TẠO HOA TUYẾT RƠI RANDOM (ĐÃ TỐI ƯU CHO PNG)
+
   const PETAL_IMAGE_SRC = null; // ← null = dùng emoji ❄️ mặc định
 
   // ── SỐ LƯỢNG HOA TRÊN MÀN HÌNH ─────────────────────────────
@@ -473,7 +422,7 @@ export default function App() {
     setPetals(Array.from({ length: PETAL_COUNT }, generatePetal));
   }, []);
 
-  // Áp dụng CSS Variables
+  // Áp dụng CSS Variables (bổ sung thêm biến notebook)
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--bg-gradient-from", customColors.bgFrom);
@@ -500,13 +449,16 @@ export default function App() {
       "--checklist-button-text",
       customColors.checklistText
     );
+    // Font
     root.style.setProperty("--font-family-title", fontTitle);
     root.style.setProperty("--font-family-body", fontBody);
   }, [customColors, fontTitle, fontBody]);
 
   const applyPalette = (paletteName) => {
     const palette = palettes[paletteName];
-    if (palette) setCustomColors((prev) => ({ ...prev, ...palette }));
+    if (palette) {
+      setCustomColors((prev) => ({ ...prev, ...palette }));
+    }
   };
 
   const resetToDefault = () => {
@@ -806,7 +758,7 @@ export default function App() {
   };
 
   // ════════════════════════════════════════════════════════════
-  //  RENDER
+  //  RENDER (giữ nguyên cấu trúc, chỉ bổ sung notebook note)
   // ════════════════════════════════════════════════════════════
   return (
     <div
@@ -815,11 +767,9 @@ export default function App() {
         background: `linear-gradient(135deg, var(--bg-gradient-from), var(--bg-gradient-via), var(--bg-gradient-to))`,
       }}
     >
-      {/* ══════════════════════════════════════════════════════
-          HOA / SNOWFLAKE PNG RƠI — V2 (LOFI DEPTH-OF-FIELD)
+      {/* HOA / SNOWFLAKE PNG RƠI — V2 (LOFI DEPTH-OF-FIELD)
           pointer-events: none trên cả container lẫn từng bông
-          → tuyệt đối không chặn click vào flashcard bên dưới
-          ══════════════════════════════════════════════════════ */}
+          → tuyệt đối không chặn click vào flashcard bên dưới */}
       <div className="petal-layer">
         {petals.map((petal) => (
           <div
@@ -896,7 +846,6 @@ export default function App() {
           </div>
         ))}
       </div>
-
       {/* Bubble gradient theo chuột */}
       <div
         ref={cursorRef}
@@ -908,8 +857,7 @@ export default function App() {
           transition: "transform 0.08s linear",
         }}
       />
-
-      {/* Welcome Modal */}
+      {/* Welcome Modal (giữ nguyên) */}
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-md">
           <div
@@ -959,14 +907,12 @@ export default function App() {
           </div>
         </div>
       )}
-
       {/* Toast trạng thái */}
       {saveStatus && (
         <div className="fixed top-4 right-4 z-40 glass border border-white/60 px-4 py-2.5 rounded-full shadow-lg">
           {renderSaveStatus()}
         </div>
       )}
-
       {/* FLOATING ACTION BUTTON (Settings) */}
       <div className="fixed bottom-6 right-6 z-50">
         <button
@@ -977,8 +923,7 @@ export default function App() {
           <Paintbrush size={28} className="text-purple-600" />
         </button>
       </div>
-
-      {/* SETTINGS SIDEBAR PANEL */}
+      {/* SETTINGS SIDEBAR PANEL (giữ nguyên) */}
       <div
         className={`fixed top-0 right-0 h-full w-80 z-50 glass shadow-2xl transform transition-transform duration-300 ease-in-out ${
           showSettings ? "translate-x-0" : "translate-x-full"
@@ -1233,9 +1178,8 @@ export default function App() {
           </div>
         </div>
       </div>
-
       {/* ════════════════════════════════════════════════════════
-          NỘI DUNG CHÍNH
+          NỘI DUNG CHÍNH (giữ nguyên logic, cập nhật textarea + notebook note)
          ════════════════════════════════════════════════════════ */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-6">
         {/* Header */}
@@ -1297,7 +1241,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* VIEW HOME */}
+        {/* VIEW HOME (giữ nguyên) */}
         {currentView === "home" && (
           <div className="space-y-8 animate-fade-in">
             <div
@@ -1328,76 +1272,73 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {decks.map((deck) => {
-                  // Gắn class reveal-card cho mỗi card
-                  return (
+                {decks.map((deck) => (
+                  <div
+                    key={deck._id}
+                    onClick={() => {
+                      setActiveDeckId(deck._id);
+                      setCurrentView("study");
+                      setCardIndex(0);
+                      setIsFlipped(false);
+                    }}
+                    className="group relative p-6 rounded-2xl cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border flex flex-col justify-between overflow-hidden"
+                    style={{
+                      background: "var(--deck-card-bg)",
+                      borderColor: "var(--deck-card-border)",
+                    }}
+                  >
                     <div
-                      key={deck._id}
-                      onClick={() => {
-                        setActiveDeckId(deck._id);
-                        setCurrentView("study");
-                        setCardIndex(0);
-                        setIsFlipped(false);
-                      }}
-                      className="group relative p-6 rounded-2xl cursor-pointer transition-all duration-300 border flex flex-col justify-between overflow-hidden reveal-card hover:-translate-y-2 hover:shadow-[0_10px_25px_-5px_rgba(244,143,177,0.3)]"
+                      className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
                       style={{
-                        background: "var(--deck-card-bg)",
-                        borderColor: "var(--deck-card-border)",
+                        background:
+                          "radial-gradient(circle, rgba(251,182,213,0.35) 0%, transparent 70%)",
                       }}
-                    >
-                      <div
-                        className="absolute -top-6 -right-6 w-28 h-28 rounded-full pointer-events-none"
+                    />
+                    <div>
+                      <h3
+                        className="text-xl font-bold mb-2 font-title line-clamp-2 pr-6 group-hover:text-purple-600 transition-colors"
+                        style={{ color: "var(--deck-title-color)" }}
+                      >
+                        {deck.title}
+                      </h3>
+                      <p
+                        className="text-sm font-semibold flex items-center gap-1.5 px-3 py-1 rounded-full w-max"
                         style={{
-                          background:
-                            "radial-gradient(circle, rgba(251,182,213,0.35) 0%, transparent 70%)",
+                          background: "var(--deck-stats-bg)",
+                          color: "var(--deck-stats-text)",
                         }}
-                      />
-                      <div>
-                        <h3
-                          className="text-xl font-bold mb-2 font-title line-clamp-2 pr-6 group-hover:text-purple-600 transition-colors"
-                          style={{ color: "var(--deck-title-color)" }}
-                        >
-                          {deck.title}
-                        </h3>
-                        <p
-                          className="text-sm font-semibold flex items-center gap-1.5 px-3 py-1 rounded-full w-max"
-                          style={{
-                            background: "var(--deck-stats-bg)",
-                            color: "var(--deck-stats-text)",
-                          }}
-                        >
-                          <BookOpen size={14} /> {(deck.cards || []).length} thẻ
-                          từ
-                        </p>
-                      </div>
-                      <div className="flex justify-end gap-2 mt-6 relative z-10">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDeckId(deck._id);
-                            setCurrentView("edit");
-                          }}
-                          className="px-4 py-2 bg-white/70 hover:bg-purple-600 hover:text-white rounded-xl text-sm font-bold transition-all border border-white shadow-sm"
-                          style={{ background: "var(--deck-button-bg)" }}
-                        >
-                          Sửa thẻ
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteDeck(deck._id, e)}
-                          className="p-2 bg-white/70 hover:bg-red-50 text-red-500 rounded-xl transition-all border border-white shadow-sm"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                      >
+                        <BookOpen size={14} /> {(deck.cards || []).length} thẻ
+                        từ
+                      </p>
                     </div>
-                  );
-                })}
+                    <div className="flex justify-end gap-2 mt-6 relative z-10">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveDeckId(deck._id);
+                          setCurrentView("edit");
+                        }}
+                        className="px-4 py-2 bg-white/70 hover:bg-purple-600 hover:text-white rounded-xl text-sm font-bold transition-all border border-white shadow-sm"
+                        style={{ background: "var(--deck-button-bg)" }}
+                      >
+                        Sửa thẻ
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteDeck(deck._id, e)}
+                        className="p-2 bg-white/70 hover:bg-red-50 text-red-500 rounded-xl transition-all border border-white shadow-sm"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* VIEW STUDY (giữ nguyên) */}
+        {/* VIEW STUDY — BỔ SUNG NOTEBOOK NOTE */}
         {currentView === "study" && activeDeck && (
           <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
@@ -1455,6 +1396,7 @@ export default function App() {
                         : "rotateX(0deg)",
                     }}
                   >
+                    {/* Mặt trước */}
                     <div
                       className="absolute inset-0 flex flex-col items-center justify-center rounded-[2rem] shadow-xl border border-white/70 p-8 text-center select-none"
                       style={{
@@ -1484,6 +1426,7 @@ export default function App() {
                         Click để xem nghĩa →
                       </p>
                     </div>
+                    {/* Mặt sau */}
                     <div
                       className="absolute inset-0 flex flex-col items-center justify-center rounded-[2rem] shadow-xl border border-white/70 p-8 text-center select-none"
                       style={{
@@ -1507,6 +1450,7 @@ export default function App() {
                       >
                         {activeDeck.cards[cardIndex]?.viet}
                       </p>
+                      {/* === NOTEBOOK NOTE: hiển thị ghi chú với scroll và markdown === */}
                       {activeDeck.cards[cardIndex]?.note && (
                         <div className="notebook-note w-full mt-2">
                           {renderSimpleMarkdown(
@@ -1586,7 +1530,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW EDIT (giữ nguyên) */}
+        {/* VIEW EDIT — THAY input NOTE BẰNG textarea */}
         {currentView === "edit" && activeDeck && (
           <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center flex-wrap gap-3">
@@ -1756,25 +1700,17 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* ========== KÍCH HOẠT SCROLL REVEAL ========== */}
-      <ScrollRevealTrigger />
     </div>
   );
 }
 
 // ════════════════════════════════════════════════════════════
-//  Component nhỏ để gọi hook useScrollReveal
+//  HƯỚNG DẪN SỬ DỤNG NOTEBOOK NOTE
 // ════════════════════════════════════════════════════════════
-const ScrollRevealTrigger = () => {
-  useScrollReveal(".reveal-card", 0.15, "0px 0px -50px 0px");
-  return null;
-};
-
-//  HƯỚNG DẪN SỬ DỤNG NOTEBOOK NOTE & SCROLL REVEAL
-
 // 1. Trong Edit view, ô "Ghi chú / Ví dụ" là textarea nhiều dòng.
 // 2. Bạn có thể nhập văn bản dài, xuống dòng, và sử dụng **chữ đậm** hoặc *chữ nghiêng*.
 // 3. Khi học ở mặt sau flashcard, phần ghi chú hiển thị trong khung "Notebook" có thanh cuộn, nền mờ, viền pastel.
-// 4. Hiệu ứng ScrollReveal: mỗi deck card có class "reveal-card", khi cuộn vào vùng nhìn thấy sẽ tự động fade-in + translateY.
-// 5. Hover effect: khi di chuột vào card, card nhấc lên 8px (hover:-translate-y-2) và đổ bóng pastel.
+// 4. Có thể tùy chỉnh màu khung note, chữ, thanh cuộn bằng các biến CSS:
+//    --notebook-bg, --notebook-border, --notebook-text, --notebook-scrollbar-thumb, --notebook-scrollbar-track
+// 5. Giữ nguyên mọi chức năng khác: phím tắt, đồng bộ DB, checklist, v.v.
+// ════════════════════════════════════════════════════════════
