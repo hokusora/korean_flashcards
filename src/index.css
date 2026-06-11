@@ -97,3 +97,53 @@ h3,
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+
+/* =========================================
+   HIỆU ỨNG HOA ANH ĐÀO RƠI LOFI (CHERRY BLOSSOM)
+   ========================================= */
+
+/* Container bọc toàn bộ hoa */
+.cherry-blossom-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none; /* QUAN TRỌNG: Xuyên qua hoa, không cản trở click vào flashcard */
+  z-index: 0; /* Đặt sau giao diện hoặc trước nền tuỳ ý */
+  overflow: hidden;
+}
+
+/* Các lớp cánh hoa rơi (petal) */
+.petal {
+  position: absolute;
+  top: -10%; /* Bắt đầu rơi từ vị trí khuất phía trên màn hình */
+  /* Chuyển động kết hợp 2 animations: fall (rơi dọc) và sway (đung đưa ngang) */
+  animation-name: fall, sway;
+  animation-timing-function: linear, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+  animation-direction: normal, alternate;
+}
+
+/* 1. Animation rơi (từ trên xuống dưới đáy màn hình) */
+@keyframes fall {
+  0% {
+    top: -10%;
+  }
+  100% {
+    top: 110%; /* Đi quá đáy màn hình rồi mới quay lại vòng mới */
+  }
+}
+
+/* 2. Animation đung đưa sang hai bên và xoay nhẹ tạo gió */
+@keyframes sway {
+  0% {
+    transform: translateX(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateX(30px) rotate(45deg);
+  }
+  100% {
+    transform: translateX(-30px) rotate(90deg);
+  }
+}
