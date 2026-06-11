@@ -40,11 +40,18 @@ import snowflakeIcon from "./assets/icons/snowflake.png";
 const SVG_TEMPLATE = (
   <img
     src={snowflakeIcon}
-    alt="snowflake"
+    alt="❄️"
     style={{
       width: "100%",
       height: "100%",
       objectFit: "contain",
+      display: "block",
+      pointerEvents: "none",
+    }}
+    onError={(e) => {
+      e.target.onerror = null;
+      e.target.style.display = "none";
+      e.target.parentElement.innerHTML = "❄️"; // fallback ký tự
     }}
   />
 );
@@ -340,30 +347,24 @@ export default function App() {
   const [petals, setPetals] = useState([]);
 
   useEffect(() => {
-    const maxPetals = 20;
-
+    const maxPetals = 40;
     const generatePetal = () => {
-      // Tăng kích thước ngẫu nhiên to lên một chút (từ 18px đến 35px) để dễ nhìn
-      const randomSize = Math.random() * 17 + 18;
-
-      // Giữ opacity nhẹ nhàng, loại bỏ hoàn toàn blurAmount để tránh bị mất ảnh PNG
-      const opacity = Math.random() * 0.4 + 0.6;
-
-      const randomFallDuration = Math.random() * 8 + 8;
-      const randomSwayDuration = Math.random() * 3 + 3;
-
+      const size = Math.random() * 30 + 24; // 24px → 54px, rõ nét
+      const opacity = Math.random() * 0.6 + 0.4;
+      const fallDuration = Math.random() * 12 + 12; // 12s–24s rơi chậm
+      const swayDuration = Math.random() * 4 + 5; // 5s–9s đung đưa
+      const delay = Math.random() * 8; // delay tối đa 8s
       return {
         id: Math.random().toString(36).substring(2, 11),
         left: `${Math.random() * 100}vw`,
-        size: randomSize,
-        opacity: opacity,
-        fallDuration: randomFallDuration,
-        swayDuration: randomSwayDuration,
-        delay: Math.random() * 15,
+        size,
+        opacity,
+        fallDuration,
+        swayDuration,
+        delay,
       };
     };
-
-    setPetals(Array.from({ length: maxPetals }).map(generatePetal));
+    setPetals(Array.from({ length: maxPetals }, generatePetal));
   }, []);
 
   // Áp dụng CSS Variables (bổ sung thêm biến notebook)
@@ -722,7 +723,6 @@ export default function App() {
               width: `${petal.size}px`,
               height: `${petal.size}px`,
               opacity: petal.opacity,
-              /* Bỏ dòng filter: blur cũ đi ở đây */
               animationDuration: `${petal.fallDuration}s, ${petal.swayDuration}s`,
               animationDelay: `${petal.delay}s, ${petal.delay}s`,
             }}
