@@ -1,9 +1,9 @@
 // ============================================================
-//  K-VOCAB STUDY LAB — App.jsx (PHIÊN BẢN HOÀN CHỈNH)
+//  K-VOCAB STUDY LAB — App.jsx (PHIÊN BẢN HOÀN CHỈNH + NOTEBOOK NOTE)
 //  + Tích hợp Personalization Panel (Floating Settings)
 //  + Điều khiển màu sắc & font chữ toàn bộ app qua CSS Variables
 //  + Giữ nguyên mọi chức năng: sign-in, database, checklist, study, edit, v.v.
-//  + Hướng dẫn đổi màu thủ công: tìm nhãn "🎨 CUSTOM VARIABLE"
+//  + BỔ SUNG: Khung "Ghi chú / Ví dụ" dạng Notebook có scroll, hỗ trợ **bold**, *italic*
 // ============================================================
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -23,8 +23,8 @@ import {
   Sparkles,
   CheckSquare,
   Loader2,
-  Paintbrush, // icon cho settings (cọ vẽ)
-  Settings, // dự phòng nếu muốn đổi
+  Paintbrush,
+  Settings,
   Palette,
 } from "lucide-react";
 import axios from "axios";
@@ -36,6 +36,7 @@ const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
 
 // ════════════════════════════════════════════════════════════
 //  CSS GLOBAL + CSS VARIABLES (màu mặc định - Pink Dream)
+//  BỔ SUNG: biến cho khung note dạng Notebook
 // ════════════════════════════════════════════════════════════
 const GLOBAL_STYLE = `
   :root {
@@ -45,48 +46,55 @@ const GLOBAL_STYLE = `
     --bg-gradient-to:   #e0e7ff;     /* indigo-100 */
 
     /* 🎨 BUBBLE GRADIENT (theo chuột) */
-    --bubble-gradient-start: rgba(255,182,193,0.45);
+    --bubble-gradient-start: rgba(255, 194, 203, 0.78);
     --bubble-gradient-mid:   rgba(196,181,253,0.2);
     --bubble-gradient-end:   transparent;
 
     /* 🎨 HEADER BAR */
     --header-bg:          rgba(255,255,255,0.45);
     --header-border:      rgba(255,255,255,0.5);
-    --header-logo-grad-from: #ff8cc6;  /* pink-500 */
-    --header-logo-grad-to:   #c88eff;  /* purple-600 */
+    --header-logo-grad-from: #ff8cc6;
+    --header-logo-grad-to:   #c88eff;
 
     /* 🎨 DECK CARD (bộ từ vựng) */
     --deck-card-bg:       rgba(255,255,255,0.42);
     --deck-card-border:   rgba(255,255,255,0.4);
-    --deck-title-color:   #111827;     /* gray-900 */
-    --deck-title-hover:   #a984ff;     /* purple-600 */
+    --deck-title-color:   #111827;
+    --deck-title-hover:   #a984ff;
     --deck-stats-bg:      rgba(255,255,255,0.4);
-    --deck-stats-text:    #fd75b9;     /* pink-500 */
+    --deck-stats-text:    #fd75b9;
     --deck-button-bg:     rgba(255,255,255,0.7);
     --deck-button-hover:  #c286fa;
 
     /* 🎨 FLASHCARD MẶT TRƯỚC (tiếng Hàn) */
     --flashcard-front-bg:        rgba(255,255,255,0.65);
-    --flashcard-front-text:      #a855f7;   /* purple-500 */
-    --flashcard-front-romaji:    #9ca3af;   /* gray-400 */
+    --flashcard-front-text:      #c894f8;
+    --flashcard-front-romaji:    #9ca3af;
 
     /* 🎨 FLASHCARD MẶT SAU (tiếng Việt) */
     --flashcard-back-bg:         linear-gradient(135deg, #fff0f8 0%, #ede9fe 100%);
-    --flashcard-back-text:       #111827;   /* gray-900 */
-    --flashcard-back-romaji:     #a855f7;   /* purple-400 */
+    --flashcard-back-text:       #111827;
+    --flashcard-back-romaji:     #a855f7;
     --flashcard-back-note-bg:    rgba(255,255,255,0.6);
-    --flashcard-back-note-text:  #4b5563;   /* gray-600 */
+    --flashcard-back-note-text:  #4b5563;
+
+    /* 🎨 KHUNG NOTE KIỂU NOTEBOOK (mới) */
+    --notebook-bg:               rgba(255,245,250,0.85);
+    --notebook-border:           rgba(255,200,220,0.6);
+    --notebook-text:             #4a1d6d;
+    --notebook-scrollbar-thumb:  #f9a8d4;
+    --notebook-scrollbar-track:  #ffe4f0;
 
     /* 🎨 NÚT MŨI TÊN & RESET */
     --nav-button-bg:       white;
-    --nav-button-hover:    #f5f3ff;   /* purple-50 */
-    --nav-button-text:     #757bff;   /* purple-700 */
+    --nav-button-hover:    #f5f3ff;
+    --nav-button-text:     #757bff;
     --nav-button-disabled-opacity: 0.3;
 
     /* 🎨 NÚT CHECKLIST "Đã học" */
-    --checklist-button-bg:     #dcfce7;   /* green-100 */
-    --checklist-button-hover:  #bbf7d0;   /* green-200 */
-    --checklist-button-text:   #16a34a;   /* green-600 */
+    --checklist-button-bg:     #dcfce7;
+    --checklist-button-hover:  #bbf7d0;
+    --checklist-button-text:   #16a34a;
     --checklist-button-border: #bbf7d0;
 
     /* 🎨 FORM EDIT & DANH SÁCH TỪ */
@@ -94,8 +102,8 @@ const GLOBAL_STYLE = `
     --edit-input-bg:       rgba(255,255,255,0.8);
     --edit-input-focus:    #a855f7;
     --edit-card-bg:        rgba(255,255,255,0.48);
-    --edit-card-korean:    #581c87;   /* purple-900 */
-    --edit-card-viet:      #1f2937;   /* gray-800 */
+    --edit-card-korean:    #581c87;
+    --edit-card-viet:      #1f2937;
     --edit-card-romaji:    #9ca3af;
     --edit-card-note-bg:   rgba(255,255,255,0.5);
     --edit-delete-icon:    #9ca3af;
@@ -103,9 +111,9 @@ const GLOBAL_STYLE = `
 
     /* 🎨 WELCOME MODAL */
     --modal-bg:            rgba(255,255,255,0.55);
-    --modal-title:         #ec4899;
+    --modal-title:         #f95caa;
     --modal-button-grad-from: #f472b6;
-    --modal-button-grad-to:   #a855f7;
+    --modal-button-grad-to:   #c38af8;
     --modal-button-secondary-bg: rgba(255,255,255,0.6);
   }
 
@@ -136,6 +144,45 @@ const GLOBAL_STYLE = `
     0%, 100% { transform: translateY(0); }
     50%       { transform: translateY(-4px); }
   }
+
+  /* ========== KIỂU NOTEBOOK CHO GHI CHÚ (scroll, glass, pastel) ========== */
+  .notebook-note {
+    background: var(--notebook-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--notebook-border);
+    border-radius: 1.5rem;
+    padding: 1rem 1.25rem;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--notebook-text);
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-word;
+    scrollbar-width: thin;
+    scrollbar-color: var(--notebook-scrollbar-thumb) var(--notebook-scrollbar-track);
+  }
+  .notebook-note::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .notebook-note::-webkit-scrollbar-track {
+    background: var(--notebook-scrollbar-track);
+    border-radius: 10px;
+  }
+  .notebook-note::-webkit-scrollbar-thumb {
+    background: var(--notebook-scrollbar-thumb);
+    border-radius: 10px;
+  }
+  .notebook-note strong {
+    color: #ee3488;
+    font-weight: 700;
+  }
+  .notebook-note em {
+    color: #9268f2;
+    font-style: italic;
+  }
 `;
 
 // Inject global style (chỉ 1 lần)
@@ -148,6 +195,23 @@ if (
   styleTag.textContent = GLOBAL_STYLE;
   document.head.appendChild(styleTag);
 }
+
+// ════════════════════════════════════════════════════════════
+//  HÀM TIỆN ÍCH: Render markdown đơn giản (**bold**, *italic*)
+// ════════════════════════════════════════════════════════════
+const renderSimpleMarkdown = (text) => {
+  if (!text) return null;
+  // Tạm thời chuyển đổi **bold** và *italic* nhưng không ảnh hưởng HTML khác
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={idx}>{part.slice(2, -2)}</strong>;
+    } else if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={idx}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+};
 
 // ════════════════════════════════════════════════════════════
 //  COMPONENT CHÍNH
@@ -182,7 +246,6 @@ export default function App() {
   // ── STATE CHO PERSONALIZATION PANEL ───────────────────────
   const [showSettings, setShowSettings] = useState(false);
   const [customColors, setCustomColors] = useState({
-    // có thể lưu từng biến hoặc dùng preset
     bgFrom: "#fbcfe8",
     bgVia: "#f3e8ff",
     bgTo: "#e0e7ff",
@@ -195,15 +258,13 @@ export default function App() {
     navButtonText: "#7e22ce",
     checklistBg: "#dcfce7",
     checklistText: "#16a34a",
-    // ... thêm nếu muốn chi tiết hơn
   });
-  // Font chọn lựa
   const [fontTitle, setFontTitle] = useState("SVN-Busan Garden, sans-serif");
   const [fontBody, setFontBody] = useState(
     "ZFangelring, -apple-system, BlinkMacSystemFont, sans-serif"
   );
 
-  // Preset palettes
+  // Preset palettes (giữ nguyên)
   const palettes = {
     "Pink Dream": {
       bgFrom: "#fbcfe8",
@@ -249,10 +310,9 @@ export default function App() {
     },
   };
 
-  // Áp dụng CSS Variables khi component mount hoặc khi customColors / font thay đổi
+  // Áp dụng CSS Variables (bổ sung thêm biến notebook)
   useEffect(() => {
     const root = document.documentElement;
-    // Áp dụng màu nền gradient
     root.style.setProperty("--bg-gradient-from", customColors.bgFrom);
     root.style.setProperty("--bg-gradient-via", customColors.bgVia);
     root.style.setProperty("--bg-gradient-to", customColors.bgTo);
@@ -282,7 +342,6 @@ export default function App() {
     root.style.setProperty("--font-family-body", fontBody);
   }, [customColors, fontTitle, fontBody]);
 
-  // Hàm áp dụng palette
   const applyPalette = (paletteName) => {
     const palette = palettes[paletteName];
     if (palette) {
@@ -290,7 +349,6 @@ export default function App() {
     }
   };
 
-  // Hàm reset về mặc định
   const resetToDefault = () => {
     setCustomColors({
       bgFrom: "#fbcfe8",
@@ -310,7 +368,7 @@ export default function App() {
     setFontBody("ZFangelring, -apple-system, BlinkMacSystemFont, sans-serif");
   };
 
-  // ── CÁC HÀM XỬ LÝ DỮ LIỆU (GIỮ NGUYÊN) ───────────────────
+  // ── CÁC HÀM XỬ LÝ DỮ LIỆU (GIỮ NGUYÊN 100%) ───────────────────
   const activeDeck = decks.find((d) => d._id === activeDeckId) || null;
   useEffect(() => {
     const onMove = (e) => {
@@ -588,7 +646,7 @@ export default function App() {
   };
 
   // ════════════════════════════════════════════════════════════
-  //  RENDER (giữ nguyên cấu trúc, chỉ thay class tĩnh bằng CSS Variables)
+  //  RENDER (giữ nguyên cấu trúc, chỉ bổ sung notebook note)
   // ════════════════════════════════════════════════════════════
   return (
     <div
@@ -620,11 +678,11 @@ export default function App() {
               className="text-3xl md:text-4xl font-black mb-4 font-title tracking-wider"
               style={{ color: "var(--modal-title)" }}
             >
-              Annyeonghaseyo! 🌸
+              Annyeonghaseyo〜〜 🌸
             </h2>
             <p className="text-gray-600 mb-8 text-base leading-relaxed font-medium">
-              Chào mừng bạn đã quay trở lại không gian học tập. Hệ thống cơ sở
-              dữ liệu đã sẵn sàng, bạn muốn cưới gái cosplay chứ 🥰
+              bạn đã quay trở lại không gian học tập. Hệ thống cơ sở dữ liệu đã
+              sẵn sàng, bạn muốn cưới gái cosplay chứ 🥰😇
             </p>
             {!user && (
               <div className="flex justify-center mb-5">
@@ -643,7 +701,7 @@ export default function App() {
                   background: `linear-gradient(to right, var(--modal-button-grad-from), var(--modal-button-grad-to))`,
                 }}
               >
-                học để đổi vận mệnh 🔥 ✨
+                học để cưới gái highlight tattoo 😋 🔥
               </button>
               <button
                 onClick={() => {
@@ -667,9 +725,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ════════════════════════════════════════════════════════
-          FLOATING ACTION BUTTON (Settings)
-         ════════════════════════════════════════════════════════ */}
+      {/* FLOATING ACTION BUTTON (Settings) */}
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => setShowSettings(!showSettings)}
@@ -680,9 +736,7 @@ export default function App() {
         </button>
       </div>
 
-      {/* ════════════════════════════════════════════════════════
-          SETTINGS SIDEBAR PANEL (trượt từ phải vào)
-         ════════════════════════════════════════════════════════ */}
+      {/* SETTINGS SIDEBAR PANEL (giữ nguyên) */}
       <div
         className={`fixed top-0 right-0 h-full w-80 z-50 glass shadow-2xl transform transition-transform duration-300 ease-in-out ${
           showSettings ? "translate-x-0" : "translate-x-full"
@@ -702,7 +756,6 @@ export default function App() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-6">
-            {/* Chọn Palette màu */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 🎨 Bảng màu có sẵn
@@ -719,7 +772,6 @@ export default function App() {
                 ))}
               </div>
             </div>
-            {/* Màu nền gradient (3 thành phần) */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 🌈 Màu nền trang
@@ -762,7 +814,6 @@ export default function App() {
                 />
               </div>
             </div>
-            {/* Màu deck card */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 📦 Bộ từ vựng (nền)
@@ -797,7 +848,6 @@ export default function App() {
                 className="w-full"
               />
             </div>
-            {/* Màu flashcard mặt trước */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 🃏 Flashcard mặt trước (nền)
@@ -830,7 +880,6 @@ export default function App() {
                 }
               />
             </div>
-            {/* Màu flashcard mặt sau */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 🃏 Flashcard mặt sau (nền)
@@ -840,8 +889,7 @@ export default function App() {
                 value="#fff0f8"
                 disabled
                 className="w-full opacity-50"
-              />{" "}
-              {/* gradient phức tạp, để mặc định */}
+              />
               <label className="block text-sm font-bold text-gray-600 mt-2">
                 📖 Màu chữ nghĩa tiếng Việt
               </label>
@@ -856,7 +904,6 @@ export default function App() {
                 }
               />
             </div>
-            {/* Màu nút điều hướng */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 ⭕ Nút mũi tên (nền)
@@ -885,7 +932,6 @@ export default function App() {
                 }
               />
             </div>
-            {/* Màu nút checklist */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 ✅ Nút Đã học (nền)
@@ -914,7 +960,6 @@ export default function App() {
                 }
               />
             </div>
-            {/* Font chữ */}
             <div>
               <label className="block text-sm font-bold text-gray-600 mb-2">
                 🔤 Font tiêu đề (tên font)
@@ -948,7 +993,7 @@ export default function App() {
       </div>
 
       {/* ════════════════════════════════════════════════════════
-          NỘI DUNG CHÍNH (giữ nguyên logic, chỉ sửa style bằng CSS Variables)
+          NỘI DUNG CHÍNH (giữ nguyên logic, cập nhật textarea + notebook note)
          ════════════════════════════════════════════════════════ */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-6">
         {/* Header */}
@@ -1010,7 +1055,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* VIEW HOME */}
+        {/* VIEW HOME (giữ nguyên) */}
         {currentView === "home" && (
           <div className="space-y-8 animate-fade-in">
             <div
@@ -1107,7 +1152,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW STUDY */}
+        {/* VIEW STUDY — BỔ SUNG NOTEBOOK NOTE */}
         {currentView === "study" && activeDeck && (
           <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
@@ -1219,16 +1264,13 @@ export default function App() {
                       >
                         {activeDeck.cards[cardIndex]?.viet}
                       </p>
+                      {/* === NOTEBOOK NOTE: hiển thị ghi chú với scroll và markdown === */}
                       {activeDeck.cards[cardIndex]?.note && (
-                        <p
-                          className="text-sm px-5 py-2.5 rounded-2xl max-w-md italic border border-white/70 shadow-sm"
-                          style={{
-                            background: "var(--flashcard-back-note-bg)",
-                            color: "var(--flashcard-back-note-text)",
-                          }}
-                        >
-                          💡 {activeDeck.cards[cardIndex].note}
-                        </p>
+                        <div className="notebook-note w-full mt-2">
+                          {renderSimpleMarkdown(
+                            activeDeck.cards[cardIndex].note
+                          )}
+                        </div>
                       )}
                       <p className="absolute bottom-5 text-xs text-gray-300 font-medium tracking-wider">
                         ← Click để lật lại
@@ -1302,7 +1344,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW EDIT */}
+        {/* VIEW EDIT — THAY input NOTE BẰNG textarea */}
         {currentView === "edit" && activeDeck && (
           <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center flex-wrap gap-3">
@@ -1373,17 +1415,16 @@ export default function App() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1 tracking-wide">
-                    Ghi chú / Ví dụ
+                    Ghi chú / Ví dụ (hỗ trợ **bold** và *italic*)
                   </label>
-                  <input
-                    type="text"
-                    placeholder="VD: 사과를 좋아해요"
+                  <textarea
+                    rows="4"
+                    placeholder="VD: **사과** là quả táo.\n*Tôi thích ăn táo.*"
                     value={newCard.note}
                     onChange={(e) =>
                       setNewCard({ ...newCard, note: e.target.value })
                     }
-                    onKeyDown={(e) => e.key === "Enter" && handleAddCard()}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 font-medium text-gray-700 placeholder-gray-300"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 font-medium text-gray-700 placeholder-gray-300 resize-y"
                     style={{ background: "var(--edit-input-bg)" }}
                   />
                 </div>
@@ -1392,7 +1433,6 @@ export default function App() {
                 onClick={handleAddCard}
                 className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-md hover:opacity-95 active:scale-[0.99] transition-all mt-2"
               >
-                {" "}
                 <Plus size={18} /> Thêm thẻ vào bộ (Auto-save DB)
               </button>
             </div>
@@ -1446,7 +1486,9 @@ export default function App() {
                             color: "var(--edit-card-romaji)",
                           }}
                         >
-                          {card.note}
+                          {card.note.length > 60
+                            ? card.note.slice(0, 60) + "…"
+                            : card.note}
                         </div>
                       )}
                       <button
@@ -1477,14 +1519,12 @@ export default function App() {
 }
 
 // ════════════════════════════════════════════════════════════
-//  HƯỚNG DẪN THAY ĐỔI MÀU THỦ CÔNG TRONG CODE
+//  HƯỚNG DẪN SỬ DỤNG NOTEBOOK NOTE
 // ════════════════════════════════════════════════════════════
-// 1. Mở file này, tìm đến khối `:root` bên trong const GLOBAL_STYLE.
-// 2. Sửa trực tiếp các biến CSS ví dụ:
-//    --bg-gradient-from: #your-color;
-//    --flashcard-front-text: #your-color;
-//    --nav-button-bg: #your-color;
-// 3. Để thay đổi font, sửa --font-family-title và --font-family-body.
-// 4. Nếu muốn thêm palette mới, thêm vào object `palettes` trong component.
-// 5. Settings panel cho phép user chọn màu tức thì mà không cần chạm code.
+// 1. Trong Edit view, ô "Ghi chú / Ví dụ" là textarea nhiều dòng.
+// 2. Bạn có thể nhập văn bản dài, xuống dòng, và sử dụng **chữ đậm** hoặc *chữ nghiêng*.
+// 3. Khi học ở mặt sau flashcard, phần ghi chú hiển thị trong khung "Notebook" có thanh cuộn, nền mờ, viền pastel.
+// 4. Có thể tùy chỉnh màu khung note, chữ, thanh cuộn bằng các biến CSS:
+//    --notebook-bg, --notebook-border, --notebook-text, --notebook-scrollbar-thumb, --notebook-scrollbar-track
+// 5. Giữ nguyên mọi chức năng khác: phím tắt, đồng bộ DB, checklist, v.v.
 // ════════════════════════════════════════════════════════════
