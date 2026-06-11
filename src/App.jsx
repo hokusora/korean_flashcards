@@ -31,28 +31,14 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
-// ==========================================
-// ICON HOA ANH ĐÀO (giữ nguyên)
-// ==========================================
-const SVG_TEMPLATE = (
-  <span
-    style={{
-      display: "inline-block",
-      fontSize: "inherit",
-      lineHeight: 1,
-      textShadow:
-        "0 0 6px rgba(255,255,255,0.8), 0 0 12px rgba(200,200,255,0.5)",
-      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
-    }}
-  >
-    ❄️
-  </span>
-);
-
 // ────────────────────────────────────────────────────────────
 //  ENDPOINT API — thay URL nếu bạn đổi backend
 // ────────────────────────────────────────────────────────────
 const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
+// Khi chạy trên máy mình (Local) thì mở dòng dưới, khóa dòng Render lại:
+//const API_URL = "http://localhost:5000";
+
+// Khi nào cần deploy lên GitHub Pages thì lại khóa dòng trên, mở dòng dưới:
 
 // ════════════════════════════════════════════════════════════
 //  CSS GLOBAL + CSS VARIABLES (màu mặc định - Pink Dream)
@@ -379,23 +365,15 @@ export default function App() {
 
   // Hàm tạo một petal với các giá trị ngẫu nhiên (kích thước, tốc độ, blur, opacity, vị trí)
   const generatePetal = () => {
-    // Kích thước ảnh (từ 20px đến 60px) – tạo chiều sâu
-    const size = Math.floor(Math.random() * 40) + 20; // 20..60
-    // Độ mờ (0.4 đến 0.9) – cánh hoa không quá đậm
+    const size = Math.floor(Math.random() * 40) + 20;
     const opacity = Math.random() * 0.5 + 0.4;
-    // Blur (0px đến 2px) – cánh hoa càng nhỏ thường blur nhẹ, nhưng có thể random
-    const blur = Math.random() * 2; // 0..2px
-    // Thời gian rơi từ đỉnh xuống đáy (8s đến 16s) – chậm, rất lofi
-    const fallDuration = Math.random() * 8 + 8; // 8..16s
-    // Thời gian lắc lư qua lại (3s đến 7s) – nhẹ nhàng
+    const blur = Math.random() * 2;
+    const fallDuration = Math.random() * 8 + 8;
     const swayDuration = Math.random() * 4 + 3;
-    // Độ trễ khi bắt đầu rơi (0s đến 5s) – tránh đồng loạt
     const delay = Math.random() * 5;
-    // Vị trí ngang ban đầu (0..100vw)
-    const left = Math.random() * 100; // vw
-
+    const left = Math.random() * 100;
     return {
-      id: Math.random().toString(36).substr(2, 10),
+      id: Math.random().toString(36).substring(2, 12),
       size,
       opacity,
       blur,
@@ -406,9 +384,8 @@ export default function App() {
     };
   };
 
-  // Tạo 20 cánh hoa khi component mount (chỉ một lần)
   useEffect(() => {
-    const maxPetals = 20; // từ 15-25 là đẹp, vừa đủ, không giật lag
+    const maxPetals = 20;
     const newPetals = Array.from({ length: maxPetals }, generatePetal);
     setPetals(newPetals);
   }, []);
@@ -506,12 +483,14 @@ export default function App() {
     try {
       setSaveStatus("saving");
       const emailParam = user?.email || "guest";
+      console.log("🔄 Fetching decks for:", emailParam);
       const res = await axios.get(`${API_URL}?userEmail=${emailParam}`);
+      console.log("✅ Decks received:", res.data);
       if (Array.isArray(res.data)) setDecks(res.data);
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus(""), 2000);
     } catch (err) {
-      console.error("Lỗi tải dữ liệu:", err);
+      console.error("❌ Lỗi tải dữ liệu:", err);
       setSaveStatus("error");
     }
   }, [user]);
@@ -775,12 +754,7 @@ export default function App() {
             }}
           >
             {/* THAY ĐƯỜNG DẪN ẢNH PNG CỦA BẠN VÀO ĐÂY */}
-            <img
-              src="./assets/icons/snowflake.png"
-              alt=""
-              style={{ width: "100%", height: "100%", display: "block" }}
-              draggable={false}
-            />
+            <span style={{ fontSize: "inherit" }}>❄️</span>
           </div>
         ))}
       </div>
