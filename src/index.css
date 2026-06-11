@@ -98,61 +98,6 @@ h3,
   transform: rotateY(180deg);
 }
 
-/* =========================================
-   HIỆU ỨNG HOA ANH ĐÀO RƠI LOFI (CHERRY BLOSSOM)
-   ========================================= */
-
-/* Container bọc toàn bộ hoa */
-
-.cherry-blossom-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-
-/* Mỗi bông tuyết */
-.petal {
-  position: absolute;
-  top: -10%;
-  animation-timing-function: linear, ease-in-out;
-  animation-iteration-count: infinite, infinite;
-  animation-direction: normal, alternate;
-  will-change: transform, top;
-  pointer-events: none;
-}
-
-/* Rơi từ trên xuống */
-@keyframes fall {
-  0% {
-    top: -10%;
-  }
-  100% {
-    top: 110%;
-  }
-}
-
-/* Đung đưa qua lại + xoay nhẹ */
-@keyframes sway {
-  0% {
-    transform: translateX(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateX(30px) rotate(10deg);
-  }
-  100% {
-    transform: translateX(-30px) rotate(20deg);
-  }
-}
-
-/* =========================================
-   SCROLL REVEAL (đã được định nghĩa trong GLOBAL_STYLE của App.jsx)
-   Nhưng để an toàn, thêm lại vào index.css
-   ========================================= */
 .reveal-card {
   opacity: 0;
   transform: translateY(30px);
@@ -163,4 +108,63 @@ h3,
 .reveal-card.revealed {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* ==========================================
+   HIỆU ỨNG CÁNH HOA / TUYẾT RƠI LOFI (PNG)
+   ========================================== */
+
+/* Container chứa tất cả cánh hoa – lớp phủ toàn màn hình, không tương tác */
+.petal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* không cản trở click vào flashcard */
+  z-index: 5; /* ở giữa background và nội dung chính (có thể chỉnh 2-10) */
+  overflow: hidden;
+}
+
+/* Mỗi cánh hoa / bông tuyết dạng PNG */
+.petal {
+  position: absolute;
+  top: -10%; /* bắt đầu từ bên trên màn hình */
+  left: 0;
+  pointer-events: none;
+  will-change: transform;
+  /* Các thuộc tính kích thước, độ mờ, blur sẽ được set bằng inline style từ JS (random) */
+}
+
+/* Animation rơi từ trên xuống dưới – tốc độ chậm */
+@keyframes fallLofi {
+  0% {
+    top: -10%;
+    transform: translateX(0px) rotate(0deg);
+  }
+  100% {
+    top: 110%;
+    transform: translateX(40px) rotate(360deg);
+  }
+}
+
+/* Animation lắc lư qua lại + xoay nhẹ – tạo cảm giác gió thoảng */
+@keyframes swayLofi {
+  0% {
+    transform: translateX(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateX(25px) rotate(15deg);
+  }
+  100% {
+    transform: translateX(-25px) rotate(30deg);
+  }
+}
+
+/* Kết hợp cả hai animation */
+.petal {
+  animation-name: fallLofi, swayLofi;
+  animation-timing-function: linear, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+  animation-direction: normal, alternate;
 }

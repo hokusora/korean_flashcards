@@ -374,20 +374,43 @@ export default function App() {
     },
   };
 
-  // ========== TUYẾT RƠI (giữ nguyên) ==========
+  // --- State cho hiệu ứng rơi (thay thế hoàn toàn code cũ) ---
   const [petals, setPetals] = useState([]);
+
+  // Hàm tạo một petal với các giá trị ngẫu nhiên (kích thước, tốc độ, blur, opacity, vị trí)
+  const generatePetal = () => {
+    // Kích thước ảnh (từ 20px đến 60px) – tạo chiều sâu
+    const size = Math.floor(Math.random() * 40) + 20; // 20..60
+    // Độ mờ (0.4 đến 0.9) – cánh hoa không quá đậm
+    const opacity = Math.random() * 0.5 + 0.4;
+    // Blur (0px đến 2px) – cánh hoa càng nhỏ thường blur nhẹ, nhưng có thể random
+    const blur = Math.random() * 2; // 0..2px
+    // Thời gian rơi từ đỉnh xuống đáy (8s đến 16s) – chậm, rất lofi
+    const fallDuration = Math.random() * 8 + 8; // 8..16s
+    // Thời gian lắc lư qua lại (3s đến 7s) – nhẹ nhàng
+    const swayDuration = Math.random() * 4 + 3;
+    // Độ trễ khi bắt đầu rơi (0s đến 5s) – tránh đồng loạt
+    const delay = Math.random() * 5;
+    // Vị trí ngang ban đầu (0..100vw)
+    const left = Math.random() * 100; // vw
+
+    return {
+      id: Math.random().toString(36).substr(2, 10),
+      size,
+      opacity,
+      blur,
+      fallDuration,
+      swayDuration,
+      delay,
+      left,
+    };
+  };
+
+  // Tạo 20 cánh hoa khi component mount (chỉ một lần)
   useEffect(() => {
-    const maxPetals = 35;
-    const generatePetal = () => ({
-      id: Math.random().toString(36).substring(2, 10),
-      left: `${Math.random() * 100}vw`,
-      size: Math.random() * 20 + 20,
-      opacity: Math.random() * 0.5 + 0.5,
-      fallDuration: Math.random() * 8 + 8,
-      swayDuration: Math.random() * 3 + 3,
-      delay: Math.random() * 4,
-    });
-    setPetals(Array.from({ length: maxPetals }, generatePetal));
+    const maxPetals = 20; // từ 15-25 là đẹp, vừa đủ, không giật lag
+    const newPetals = Array.from({ length: maxPetals }, generatePetal);
+    setPetals(newPetals);
   }, []);
 
   // Áp dụng CSS Variables
@@ -733,27 +756,31 @@ export default function App() {
       }}
     >
       {/* CHERRY BLOSSOM CONTAINER */}
-      <div className="cherry-blossom-container">
+      {/* LỚP PHỦ CÁNH HOA RƠI (PNG) */}
+      <div className="petal-container">
         {petals.map((petal) => (
           <div
             key={petal.id}
             className="petal"
             style={{
-              left: petal.left,
-              fontSize: `${petal.size}px`,
+              left: `${petal.left}vw`,
+              width: `${petal.size}px`,
+              height: `${petal.size}px`,
               opacity: petal.opacity,
+              filter: `blur(${petal.blur}px)`,
               animationDuration: `${petal.fallDuration}s, ${petal.swayDuration}s`,
               animationDelay: `${petal.delay}s, ${petal.delay}s`,
+              // bạn có thể thêm transform nhẹ để cánh hoa nghiêng ngẫu nhiên
+              transform: `rotate(${Math.random() * 360}deg)`,
             }}
           >
-            <span
-              style={{
-                display: "inline-block",
-                filter: "drop-shadow(0 0 4px rgba(255,255,255,0.8))",
-              }}
-            >
-              {SVG_TEMPLATE}
-            </span>
+            {/* THAY ĐƯỜNG DẪN ẢNH PNG CỦA BẠN VÀO ĐÂY */}
+            <img
+              src="./assets/icons/snowflake.png"
+              alt=""
+              style={{ width: "100%", height: "100%", display: "block" }}
+              draggable={false}
+            />
           </div>
         ))}
       </div>
