@@ -47,8 +47,8 @@ const SVG_TEMPLATE = (
 // ────────────────────────────────────────────────────────────
 //  ENDPOINT API — thay URL nếu bạn đổi backend
 // ────────────────────────────────────────────────────────────
-//const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
-const API_URL = "http://localhost:5000";
+const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
+//const API_URL = "http://localhost:5000";
 // ════════════════════════════════════════════════════════════
 //  CSS GLOBAL + CSS VARIABLES (màu mặc định - Pink Dream)
 //  BỔ SUNG: biến cho khung note dạng Notebook
