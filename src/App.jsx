@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -8,21 +8,27 @@ import {
   BookOpen,
   RotateCcw,
   ArrowRight,
-  CheckSquare,
+  Save,
+  Check,
+  X,
   LogOut,
   Sparkles,
+  CheckSquare,
+  Loader2,
 } from "lucide-react";
 import axios from "axios";
 
-// Đảm bảo link Backend này vẫn đang hoạt động
+// Đảm bảo API liên kết với Backend Render của bạn
 const API_URL = "https://flashcard-backend-aa18.onrender.com/api/decks";
 
 export default function App() {
+  // --- CÁC STATE QUẢN LÝ DỮ LIỆU VÀ GIAO DIỆN ---
   const [decks, setDecks] = useState([]);
   const [currentView, setCurrentView] = useState("home");
   const [activeDeckId, setActiveDeckId] = useState(null);
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(""); // "saving" | "saved" | "error" | ""
 
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
   const [newDeckTitle, setNewDeckTitle] = useState("");
@@ -40,29 +46,59 @@ export default function App() {
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  // Hiệu ứng chuột Bubble Gradient
+  // 1. Logic Hiệu ứng chuột (Bubble Gradient)
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
+    const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  // Lấy dữ liệu từ Database đúng với user hiện tại
-  useEffect(() => {
-    const fetchDecks = async () => {
-      try {
-        const emailToFetch = user ? user.email : "default";
-        const res = await axios.get(`${API_URL}?userEmail=${emailToFetch}`);
-        setDecks(res.data);
-      } catch (error) {
-        console.error("Lỗi tải dữ liệu:", error);
-      }
-    };
-    fetchDecks();
+  // 2. Logic Lấy dữ liệu từ MongoDB an toàn
+  const fetchDecks = useCallback(async () => {
+    try {
+      setSaveStatus("saving");
+      const emailToFetch = user ? user.email : "default";
+      const res = await axios.get(`${API_URL}?userEmail=${emailToFetch}`);
+      setDecks(res.data);
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 2000);
+    } catch (error) {
+      console.error("Lỗi tải dữ liệu:", error);
+      setSaveStatus("error");
+    }
   }, [user]);
 
+  useEffect(() => {
+    fetchDecks();
+  }, [fetchDecks]);
+
+  // 3. Phím tắt Keyboard (Space để lật, Arrow để Next/Prev)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (currentView !== "study" || !activeDeckId) return;
+      const deck = decks.find((d) => d._id === activeDeckId);
+      if (!deck || !deck.cards || deck.cards.length === 0) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        setIsFlipped((prev) => !prev);
+      } else if (e.code === "ArrowRight") {
+        if (cardIndex < deck.cards.length - 1) {
+          setCardIndex((prev) => prev + 1);
+          setIsFlipped(false);
+        }
+      } else if (e.code === "ArrowLeft") {
+        if (cardIndex > 0) {
+          setCardIndex((prev) => prev - 1);
+          setIsFlipped(false);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentView, activeDeckId, decks, cardIndex]);
+
+  // 4. Logic Đăng Nhập / Đăng Xuất
   const handleLoginSuccess = (credentialResponse) => {
     const decoded = jwtDecode(credentialResponse.credential);
     const userData = {
@@ -72,6 +108,7 @@ export default function App() {
     };
     setUser(userData);
     localStorage.setItem("flashcard_user", JSON.stringify(userData));
+    setShowWelcomeModal(false);
   };
 
   const handleLogout = () => {
@@ -81,58 +118,110 @@ export default function App() {
     setCurrentView("home");
   };
 
-  // ĐÃ FIX LỖI DATABASE: Bắt buộc đính kèm userEmail để MongoDB chấp nhận lưu vĩnh viễn
+  // 5. FIX LỖI DATABASE: Tạo bộ từ vựng (Lưu đúng _id trả về từ MongoDB)
   const handleCreateDeck = async () => {
     if (!newDeckTitle.trim()) return;
     try {
+      setSaveStatus("saving");
       const userEmail = user ? user.email : "default";
-      const res = await axios.post(API_URL, {
+      const payload = {
         title: newDeckTitle,
         color: "bg-white/40",
         userEmail: userEmail,
-      });
-      setDecks([...decks, res.data]);
+        cards: [],
+      };
+      const res = await axios.post(API_URL, payload);
+      // Bắt buộc lấy res.data để lấy mã _id gốc từ MongoDB
+      setDecks((prev) => [...prev, res.data]);
       setNewDeckTitle("");
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 2000);
     } catch (error) {
       console.error("Lỗi tạo bộ từ:", error);
-      alert("Lỗi khi lưu vào Database, vui lòng kiểm tra lại!");
-    }
-  };
-
-  // ĐÃ FIX LỖI DATABASE: Tương tự với việc thêm thẻ
-  const handleAddCard = async () => {
-    if (!newCard.korean || !newCard.viet) return;
-    try {
-      const res = await axios.put(`${API_URL}/${activeDeckId}/cards`, newCard);
-      setDecks(decks.map((d) => (d._id === activeDeckId ? res.data : d)));
-      setNewCard({ korean: "", romaji: "", viet: "", note: "" });
-    } catch (error) {
-      console.error("Lỗi thêm thẻ:", error);
+      setSaveStatus("error");
+      alert("Lỗi khi lưu bộ từ vựng vào Database!");
     }
   };
 
   const handleDeleteDeck = async (deckId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa toàn bộ từ vựng này không?"))
+      return;
     try {
+      setSaveStatus("saving");
       await axios.delete(`${API_URL}/${deckId}`);
-      setDecks(decks.filter((d) => d._id !== deckId));
+      setDecks((prev) => prev.filter((d) => d._id !== deckId));
       if (activeDeckId === deckId) setCurrentView("home");
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 2000);
     } catch (error) {
       console.error("Lỗi xóa bộ từ:", error);
+      setSaveStatus("error");
     }
   };
 
-  // TÍNH NĂNG MỚI: Đánh dấu đã học và đưa vào bộ sưu tập riêng
+  // 6. FIX LỖI DATABASE: Thêm thẻ từ mới
+  const handleAddCard = async () => {
+    if (!newCard.korean || !newCard.viet) {
+      alert("Vui lòng nhập tối thiểu tiếng Hàn và nghĩa tiếng Việt!");
+      return;
+    }
+    try {
+      setSaveStatus("saving");
+      // Dùng activeDeckId (đã được fix để luôn tồn tại nhờ hàm CreateDeck chuẩn)
+      const res = await axios.put(`${API_URL}/${activeDeckId}/cards`, newCard);
+      // Ghi đè lại deck cũ bằng deck mới (chứa mảng thẻ đã update _id từ DB)
+      setDecks((prev) =>
+        prev.map((d) => (d._id === activeDeckId ? res.data : d))
+      );
+      setNewCard({ korean: "", romaji: "", viet: "", note: "" });
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 2000);
+    } catch (error) {
+      console.error("Lỗi thêm thẻ:", error);
+      setSaveStatus("error");
+    }
+  };
+
+  // 7. Logic Xóa một thẻ từ cụ thể trong Edit Mode
+  const handleDeleteCard = async (cardId) => {
+    if (!window.confirm("Xóa thẻ từ này khỏi danh sách?")) return;
+    try {
+      setSaveStatus("saving");
+      const currentDeck = decks.find((d) => d._id === activeDeckId);
+      // Lọc bỏ thẻ bị xóa
+      const updatedCards = currentDeck.cards.filter(
+        (c) => (c._id || c.id) !== cardId
+      );
+
+      // Update lại toàn bộ mảng thẻ của Deck lên MongoDB
+      const res = await axios.put(`${API_URL}/${activeDeckId}`, {
+        ...currentDeck,
+        cards: updatedCards,
+      });
+
+      setDecks((prev) =>
+        prev.map((d) => (d._id === activeDeckId ? res.data : d))
+      );
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus(""), 2000);
+    } catch (error) {
+      console.error("Lỗi xóa thẻ:", error);
+      setSaveStatus("error");
+    }
+  };
+
+  // 8. TÍNH NĂNG MỚI: Checkbox Đã học
   const handleMarkAsLearned = async (card) => {
     if (!user) {
       alert("Vui lòng đăng nhập để lưu từ này vào danh sách 'Đã học' nhé!");
       return;
     }
     try {
+      setSaveStatus("saving");
       let learnedDeck = decks.find(
         (d) => d.title === "Đã học ✅" && d.userEmail === user.email
       );
 
-      // Nếu chưa có bộ "Đã học ✅", tạo mới ngay trên Database
       if (!learnedDeck) {
         const createRes = await axios.post(API_URL, {
           title: "Đã học ✅",
@@ -143,16 +232,15 @@ export default function App() {
         setDecks((prev) => [...prev, learnedDeck]);
       }
 
-      // Tránh lặp từ nếu đã thêm rồi
       const isAlreadyLearned = learnedDeck.cards?.some(
         (c) => c.korean === card.korean
       );
       if (isAlreadyLearned) {
-        alert("Từ này đã có trong bộ Đã học rồi!");
+        alert("Từ này đã nằm trong bộ Đã học rồi!");
+        setSaveStatus("");
         return;
       }
 
-      // Lưu từ đó vào bộ "Đã học"
       const updateRes = await axios.put(`${API_URL}/${learnedDeck._id}/cards`, {
         korean: card.korean,
         romaji: card.romaji,
@@ -163,18 +251,44 @@ export default function App() {
       setDecks((prev) =>
         prev.map((d) => (d._id === learnedDeck._id ? updateRes.data : d))
       );
+      setSaveStatus("saved");
       alert("✨ Đã thêm vào danh sách Đã học!");
+      setTimeout(() => setSaveStatus(""), 2000);
     } catch (error) {
       console.error("Lỗi khi lưu từ đã học:", error);
+      setSaveStatus("error");
     }
+  };
+
+  // Hàm render hiển thị trạng thái đồng bộ
+  const renderSaveStatus = () => {
+    if (saveStatus === "saving")
+      return (
+        <span className="flex items-center gap-1 text-blue-500 font-medium text-sm bg-white/60 px-3 py-1 rounded-full">
+          <Loader2 className="animate-spin" size={14} /> Đang đồng bộ...
+        </span>
+      );
+    if (saveStatus === "saved")
+      return (
+        <span className="flex items-center gap-1 text-green-600 font-medium text-sm bg-white/60 px-3 py-1 rounded-full">
+          <Check size={14} /> Đã lưu an toàn
+        </span>
+      );
+    if (saveStatus === "error")
+      return (
+        <span className="flex items-center gap-1 text-red-500 font-medium text-sm bg-white/60 px-3 py-1 rounded-full">
+          <X size={14} /> Lỗi kết nối Database
+        </span>
+      );
+    return null;
   };
 
   const activeDeck = decks.find((d) => d._id === activeDeckId);
 
   return (
-    // THAY ĐỔI 1: Màu nền tổng thể toàn trang web (bg-gradient-to-br from-pink-100 via-purple-100 to-indigo-100)
+    // [MÀU SẮC BẠN CUSTOM] - Đổi lại bg-gradient-to-br theo mã của bạn
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-pink-100 via-purple-100 to-indigo-100 font-sans">
-      {/* Lớp Bubble Gradient đi theo con trỏ chuột */}
+      {/* Hiệu ứng Bubble Gradient */}
       <div
         className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"
         style={{
@@ -182,14 +296,16 @@ export default function App() {
         }}
       />
 
-      {/* THAY ĐỔI 2: Welcome Modal và màu sắc của nó */}
+      {/* Modal Welcome */}
       {showWelcomeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
+          {/* [MÀU SẮC BẠN CUSTOM] Khung nền thẻ (bg-white/60) */}
           <div className="bg-white/60 backdrop-blur-2xl border border-white/50 p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center">
+            {/* [MÀU SẮC BẠN CUSTOM] Đổi text-pink-500 thành màu bạn muốn */}
             <h2 className="text-4xl font-bold font-title text-pink-500 mb-4 tracking-wide">
               Annyeong! 🌸
             </h2>
-            <p className="text-gray-600 mb-8">
+            <p className="text-gray-600 mb-8 font-medium">
               Sẵn sàng đắm chìm vào thế giới từ vựng tiếng Hàn hôm nay chưa?
             </p>
             <div className="flex gap-4 justify-center">
@@ -205,20 +321,25 @@ export default function App() {
       )}
 
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl">
-        {/* Header & Đăng nhập */}
+        {/* Header Bar */}
         <div className="flex justify-between items-center mb-12 bg-white/40 backdrop-blur-md p-4 rounded-2xl border border-white/50 shadow-sm">
-          <h1
-            onClick={() => setCurrentView("home")}
-            className="text-2xl md:text-3xl font-black font-title text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 cursor-pointer flex items-center gap-2"
-          >
-            <Sparkles className="text-pink-400" />
-            Korean Flashcards
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1
+              onClick={() => setCurrentView("home")}
+              className="text-2xl md:text-3xl font-black font-title text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 cursor-pointer flex items-center gap-2"
+            >
+              <Sparkles className="text-pink-400" />
+              Korean Flashcards
+            </h1>
+            {/* Hiển thị thanh Status đồng bộ ở đây */}
+            <div className="hidden md:block">{renderSaveStatus()}</div>
+          </div>
+
           <div>
             {!user ? (
               <GoogleLogin
                 onSuccess={handleLoginSuccess}
-                onError={() => console.log("Login Failed")}
+                onError={() => setSaveStatus("error")}
                 useOneTap
               />
             ) : (
@@ -243,7 +364,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* View Trang chủ */}
+        {/* ===================== VIEW 1: HOME (TRANG CHỦ) ===================== */}
         {currentView === "home" && (
           <div className="space-y-8 animate-fade-in">
             <div className="flex gap-4">
@@ -252,7 +373,7 @@ export default function App() {
                 placeholder="Tạo bộ từ vựng mới (VD: TOPIK II)..."
                 value={newDeckTitle}
                 onChange={(e) => setNewDeckTitle(e.target.value)}
-                className="flex-1 px-6 py-4 rounded-2xl border border-white/60 bg-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-pink-300 text-gray-700 placeholder-gray-400 shadow-sm"
+                className="flex-1 px-6 py-4 rounded-2xl border border-white/60 bg-white/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-pink-300 text-gray-700 placeholder-gray-400 shadow-sm font-medium"
                 onKeyPress={(e) => e.key === "Enter" && handleCreateDeck()}
               />
               <button
@@ -266,7 +387,6 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {decks.map((deck) => (
-                // THAY ĐỔI 3: Khung chứa bộ từ vựng (Deck)
                 <div
                   key={deck._id}
                   className="group relative bg-white/40 backdrop-blur-xl border border-white/60 p-6 rounded-3xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
@@ -293,7 +413,7 @@ export default function App() {
                   </div>
                   <div className="flex items-center gap-2 text-pink-500 font-medium">
                     <BookOpen size={16} />
-                    <span>{deck.cards?.length || 0} thẻ từ</span>
+                    <span>{(deck.cards || []).length} thẻ từ</span>
                   </div>
                 </div>
               ))}
@@ -301,7 +421,7 @@ export default function App() {
           </div>
         )}
 
-        {/* View Màn hình học (Study Mode) với hiệu ứng lật thẻ 3D chuẩn Quizlet */}
+        {/* ===================== VIEW 2: STUDY (HỌC TỪ VỰNG) ===================== */}
         {currentView === "study" && activeDeck && (
           <div className="max-w-3xl mx-auto animate-fade-in">
             <div className="flex justify-between items-center mb-8">
@@ -311,9 +431,14 @@ export default function App() {
               >
                 <ArrowLeft size={24} />
               </button>
-              <h2 className="text-2xl font-bold font-title text-gray-800">
-                {activeDeck.title}
-              </h2>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold font-title text-gray-800">
+                  {activeDeck.title}
+                </h2>
+                <span className="text-sm text-gray-500 font-medium">
+                  Phím tắt: Space để lật, Trái/Phải để chuyển từ
+                </span>
+              </div>
               <button
                 onClick={() => setCurrentView("edit")}
                 className="px-6 py-2 bg-white/50 hover:bg-white/80 rounded-xl text-pink-600 font-bold transition shadow-sm border border-white/50"
@@ -322,9 +447,9 @@ export default function App() {
               </button>
             </div>
 
-            {activeDeck.cards?.length > 0 ? (
+            {activeDeck.cards && activeDeck.cards.length > 0 ? (
               <div className="flex flex-col items-center">
-                <span className="mb-4 font-medium text-gray-500 bg-white/50 px-4 py-1 rounded-full border border-white/50">
+                <span className="mb-4 font-bold text-gray-500 bg-white/50 px-4 py-1.5 rounded-full border border-white/50 shadow-sm">
                   {cardIndex + 1} / {activeDeck.cards.length}
                 </span>
 
@@ -342,34 +467,34 @@ export default function App() {
                         : "rotateX(0deg)",
                     }}
                   >
-                    {/* THAY ĐỔI 4: Flashcard Mặt Trước (Tiếng Hàn) */}
+                    {/* [MÀU SẮC BẠN CUSTOM] Mặt trước: Tiếng Hàn */}
                     <div
                       className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-2xl border border-white/80 rounded-[2.5rem] shadow-xl p-8"
                       style={{ backfaceVisibility: "hidden" }}
                     >
-                      <span className="font-title text-7xl font-bold text-[#FFdeee] mb-6 drop-shadow-sm">
+                      <span className="font-title text-7xl font-bold text-pink-500 mb-6 drop-shadow-sm">
                         {activeDeck.cards[cardIndex].korean}
                       </span>
                       {activeDeck.cards[cardIndex].romaji && (
-                        <span className="text-2xl text-gray-400 font-medium tracking-widest uppercase">
+                        <span className="text-2xl text-gray-400 font-bold tracking-widest uppercase">
                           [{activeDeck.cards[cardIndex].romaji}]
                         </span>
                       )}
                     </div>
 
-                    {/* THAY ĐỔI 5: Flashcard Mặt Sau (Nghĩa Tiếng Việt) */}
+                    {/* [MÀU SẮC BẠN CUSTOM] Mặt sau: Tiếng Việt */}
                     <div
-                      className="absolute inset-0 flex flex-col items-center justify-center bg-[#c2b0ff] border border-white/80 rounded-[2.5rem] shadow-xl p-8"
+                      className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-pink-50 to-purple-100 border border-white/80 rounded-[2.5rem] shadow-xl p-8"
                       style={{
                         backfaceVisibility: "hidden",
                         transform: "rotateX(180deg)",
                       }}
                     >
-                      <span className="font-title text-4xl font-bold text-[#1bdde0] mb-6 text-center">
+                      <span className="font-title text-4xl font-bold text-purple-700 mb-6 text-center">
                         {activeDeck.cards[cardIndex].viet}
                       </span>
                       {activeDeck.cards[cardIndex].note && (
-                        <div className="text-lg text-gray-600 text-center max-w-md bg-white/50 p-4 rounded-2xl border border-white/50">
+                        <div className="text-lg text-gray-600 text-center max-w-md bg-white/50 p-4 rounded-2xl border border-white/50 font-medium">
                           {activeDeck.cards[cardIndex].note}
                         </div>
                       )}
@@ -390,7 +515,6 @@ export default function App() {
                     <ArrowLeft size={28} />
                   </button>
 
-                  {/* THAY ĐỔI 6: Nút Check Đã Học */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -419,12 +543,12 @@ export default function App() {
               </div>
             ) : (
               <div className="text-center py-20 bg-white/40 backdrop-blur-xl rounded-3xl border border-white/50">
-                <p className="text-gray-500 mb-4 text-lg">
+                <p className="text-gray-500 mb-4 text-lg font-medium">
                   Chưa có thẻ từ nào trong bộ này cả 🌸
                 </p>
                 <button
                   onClick={() => setCurrentView("edit")}
-                  className="px-6 py-2 bg-pink-100 text-pink-600 rounded-xl font-bold hover:bg-pink-200 transition"
+                  className="px-6 py-3 bg-gradient-to-r from-pink-400 to-purple-400 text-white rounded-xl font-bold hover:opacity-90 transition shadow-md"
                 >
                   Thêm thẻ mới ngay
                 </button>
@@ -433,26 +557,30 @@ export default function App() {
           </div>
         )}
 
-        {/* View Chỉnh sửa (Edit Mode) */}
+        {/* ===================== VIEW 3: EDIT (CHỈNH SỬA) ===================== */}
         {currentView === "edit" && activeDeck && (
           <div className="max-w-4xl mx-auto animate-fade-in">
-            <div className="flex items-center gap-4 mb-8">
-              <button
-                onClick={() => setCurrentView("study")}
-                className="p-3 bg-white/50 hover:bg-white/80 rounded-full text-gray-600 transition shadow-sm"
-              >
-                <ArrowLeft size={24} />
-              </button>
-              <h2 className="text-2xl font-bold font-title text-gray-800">
-                Sửa bộ: {activeDeck.title}
-              </h2>
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setCurrentView("study")}
+                  className="p-3 bg-white/50 hover:bg-white/80 rounded-full text-gray-600 transition shadow-sm border border-white/50"
+                >
+                  <ArrowLeft size={24} />
+                </button>
+                <h2 className="text-2xl font-bold font-title text-gray-800">
+                  Sửa bộ: {activeDeck.title}
+                </h2>
+              </div>
+              <div className="md:hidden">{renderSaveStatus()}</div>
             </div>
 
+            {/* Khung Nhập thẻ từ mới */}
             <div className="bg-white/50 backdrop-blur-xl p-8 rounded-3xl border border-white/60 shadow-xl mb-8">
-              <h3 className="text-lg font-bold text-pink-600 mb-6">
-                Thêm thẻ từ mới
+              <h3 className="text-lg font-bold text-pink-600 mb-6 flex items-center gap-2">
+                <Plus size={20} /> Thêm thẻ từ mới
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <input
                   type="text"
                   placeholder="Tiếng Hàn (Bắt buộc)"
@@ -460,7 +588,7 @@ export default function App() {
                   onChange={(e) =>
                     setNewCard({ ...newCard, korean: e.target.value })
                   }
-                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300 font-title text-lg"
+                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300 font-title text-xl text-gray-800 placeholder-gray-400 shadow-sm"
                 />
                 <input
                   type="text"
@@ -469,7 +597,7 @@ export default function App() {
                   onChange={(e) =>
                     setNewCard({ ...newCard, viet: e.target.value })
                   }
-                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300 font-medium"
+                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300 font-medium text-lg text-gray-800 placeholder-gray-400 shadow-sm"
                 />
                 <input
                   type="text"
@@ -478,7 +606,7 @@ export default function App() {
                   onChange={(e) =>
                     setNewCard({ ...newCard, romaji: e.target.value })
                   }
-                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300 text-gray-700 shadow-sm"
                 />
                 <input
                   type="text"
@@ -487,48 +615,62 @@ export default function App() {
                   onChange={(e) =>
                     setNewCard({ ...newCard, note: e.target.value })
                   }
-                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  className="p-4 rounded-xl border border-white bg-white/60 focus:outline-none focus:ring-2 focus:ring-pink-300 text-gray-700 shadow-sm"
                 />
               </div>
               <button
                 onClick={handleAddCard}
-                className="w-full py-4 bg-gradient-to-r from-pink-400 to-purple-400 text-white rounded-xl font-bold hover:opacity-90 transition shadow-md"
+                className="w-full py-4 bg-gradient-to-r from-pink-400 to-purple-400 text-white rounded-xl font-bold hover:opacity-90 transition shadow-md flex justify-center items-center gap-2"
               >
-                Lưu thẻ từ
+                <Save size={20} /> Lưu thẻ từ
               </button>
             </div>
 
-            {/* THAY ĐỔI 7: Danh sách từ */}
+            {/* Danh sách thẻ từ */}
             <div className="bg-white/40 backdrop-blur-md rounded-3xl p-6 border border-white/50 shadow-lg">
-              <h3 className="text-lg font-bold text-gray-700 mb-6">
-                Danh sách từ đã thêm
+              <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center gap-2">
+                <BookOpen size={20} /> Danh sách từ đã thêm (
+                {(activeDeck.cards || []).length})
               </h3>
-              <div className="space-y-3">
-                {activeDeck.cards?.map((card, index) => (
-                  <div
-                    key={card._id || index}
-                    className="flex items-center justify-between p-4 bg-white/60 border border-white/80 rounded-2xl group hover:shadow-md transition"
-                  >
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                      <span className="font-title text-xl text-pink-600 font-bold">
-                        {card.korean}
-                      </span>
-                      <span className="text-gray-400 text-sm">
-                        [{card.romaji || "-"}]
-                      </span>
-                      <span className="font-medium text-gray-800">
-                        {card.viet}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => console.log("Tính năng xóa chưa gán API")} // Cần gọi API xóa thẻ cụ thể ở đây
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition opacity-0 group-hover:opacity-100"
+
+              {activeDeck.cards && activeDeck.cards.length > 0 ? (
+                <div className="space-y-3">
+                  {activeDeck.cards.map((card, index) => (
+                    <div
+                      key={card._id || card.id || index}
+                      className="flex items-center justify-between p-4 bg-white/60 border border-white/80 rounded-2xl group hover:shadow-md transition"
                     >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                        <span className="font-title text-2xl text-pink-600 font-bold col-span-1">
+                          {card.korean}
+                        </span>
+                        <span className="text-gray-400 text-sm font-bold tracking-wide col-span-1">
+                          {card.romaji ? `[${card.romaji}]` : "-"}
+                        </span>
+                        <span className="font-medium text-gray-800 text-lg col-span-1">
+                          {card.viet}
+                        </span>
+                        <span className="text-xs text-gray-500 truncate col-span-1">
+                          {card.note || ""}
+                        </span>
+                      </div>
+
+                      {/* Nút XÓA thẻ con (Đã gọi API đầy đủ) */}
+                      <button
+                        onClick={() => handleDeleteCard(card._id || card.id)}
+                        className="rounded-xl p-3 text-gray-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                        title="Xóa thẻ từ"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 font-medium">
+                  Chưa có thẻ từ nào. Hãy thêm ở phía trên!
+                </div>
+              )}
             </div>
           </div>
         )}
